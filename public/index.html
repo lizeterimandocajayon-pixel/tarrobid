@@ -569,9 +569,12 @@ async function renderAdminShifts() {
       </div>
       ${!shifts.length ? '<div class="empty">No shifts yet.</div>' :
         shifts.map(s=>`
-          <div class="shift-row">
+          <div class="shift-row" id="shift-row-${s.id}">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span class="shift-name">${s.name}</span>
+            <span class="shift-name" id="shift-name-${s.id}">${s.name}</span>
+            <input id="shift-edit-${s.id}" value="${s.name}" style="display:none;flex:1;height:28px;padding:0 8px;border:1px solid var(--p400);border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')saveShiftEdit(${s.id})" />
+            <button class="btn-ghost" style="height:26px;font-size:11px;padding:0 8px" onclick="startShiftEdit(${s.id})">Edit</button>
+            <button class="btn-ghost" id="shift-save-${s.id}" style="display:none;height:26px;font-size:11px;padding:0 8px;color:var(--p700)" onclick="saveShiftEdit(${s.id})">Save</button>
             <button class="del-btn" onclick="delShift(${s.id})">×</button>
           </div>`).join('')}
     </div>`;
@@ -972,6 +975,28 @@ function refreshAdmin() {
 function refreshAgent() {
   if (currentAgent) renderAgentBid();
   showToast('Refreshed');
+}
+
+function startShiftEdit(id) {
+  const nameEl = document.getElementById('shift-name-'+id);
+  const inputEl = document.getElementById('shift-edit-'+id);
+  const saveBtn = document.getElementById('shift-save-'+id);
+  nameEl.style.display = 'none';
+  inputEl.style.display = 'block';
+  saveBtn.style.display = 'inline-flex';
+  inputEl.focus();
+  inputEl.select();
+}
+
+async function saveShiftEdit(id) {
+  const inputEl = document.getElementById('shift-edit-'+id);
+  const newName = inputEl.value.trim();
+  if (!newName) return;
+  try {
+    await api(`/shifts?id=${id}`, 'PUT', { name: newName });
+    showToast('✓ Shift updated!');
+    await renderAdminShifts();
+  } catch(e) { showToast('Error updating shift', 'error'); }
 }
 
 function showToast(msg, type='success') {
