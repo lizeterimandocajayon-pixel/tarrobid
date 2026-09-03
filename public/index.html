@@ -479,8 +479,7 @@ async function renderAdminRanking() {
         </div>
       </div>
       <div class="add-bar">
-        <input class="f1" id="a-name" placeholder="Agent name" />
-        <input style="flex:0 0 90px" id="a-pos" placeholder="POS ID" />
+        <input class="f1" id="a-pos" placeholder="POS ID" />
         <input class="fw82" id="a-adh" placeholder="Adh %" type="number" min="0" max="100" step="0.01" />
         <input class="fw82" id="a-aht" placeholder="AHT (s)" type="number" min="0" step="1" />
         <button class="btn-add" onclick="addAgent()">+ Add</button>
@@ -488,7 +487,7 @@ async function renderAdminRanking() {
       ${!agents.length ? '<div class="empty">No agents yet. Add your first PA above.</div>' : `
       <table>
         <thead><tr>
-          <th style="width:36px">#</th><th>Agent</th><th>POS ID</th><th>Adherence %</th><th>AHT (s)</th><th>1st bid</th><th></th>
+          <th style="width:36px">#</th><th>POS ID</th><th>Adherence %</th><th>AHT (s)</th><th>1st bid</th><th></th>
         </tr></thead>
         <tbody>
         ${agents.map((a,i) => {
@@ -497,8 +496,7 @@ async function renderAdminRanking() {
           const s1 = bid&&bid.pref1_shift_id ? shiftMap[bid.pref1_shift_id] : null;
           return `<tr>
             <td><div class="rank-num ${rankClass(i)}">${i+1}</div></td>
-            <td style="font-weight:500">${a.name}${isTie?'<span class="tie-tag">AHT tb</span>':''}</td>
-            <td style="font-size:12px;color:var(--text3)">${a.pos_id||'—'}</td>
+            <td style="font-weight:500">${a.pos_id||a.name}${isTie?'<span class="tie-tag">AHT tb</span>':''}</td>
             <td><input class="metric-input" type="number" min="0" max="100" step="0.01" value="${a.adherence}" onchange="updateAgent(${a.id},this.value,null)" /></td>
             <td><input class="metric-input" type="number" min="0" step="1" value="${a.aht}" onchange="updateAgent(${a.id},null,this.value)" /></td>
             <td>${s1?`<span class="shift-pill">${s1.name}</span>`:'<span style="font-size:12px;color:var(--text3)">—</span>'}</td>
@@ -508,29 +506,28 @@ async function renderAdminRanking() {
         </tbody>
       </table>`}
     </div>`;
-  document.getElementById('a-name').addEventListener('keydown', e => e.key==='Enter' && addAgent());
+  document.getElementById('a-pos').addEventListener('keydown', e => e.key==='Enter' && addAgent());
 }
 
 async function toggleBidding(open) {
   await api('/bidding', 'POST', { open });
   biddingOpen = open;
+  showToast(open ? '🟢 Bidding is now open!' : '🔴 Bidding closed');
   renderAdminRanking();
   updateBidStatusBadge();
 }
 
 async function addAgent() {
-  const name = document.getElementById('a-name').value.trim();
   const posId = document.getElementById('a-pos').value.trim().toUpperCase();
   const adh = parseFloat(document.getElementById('a-adh').value);
   const aht = parseFloat(document.getElementById('a-aht').value);
-  if (!name||!posId||isNaN(adh)||isNaN(aht)) return;
-  await api('/agents','POST',{name,pos_id:posId,adherence:adh,aht,agent_type:TYPE});
-  document.getElementById('a-name').value='';
+  if (!posId||isNaN(adh)||isNaN(aht)) return;
+  await api('/agents','POST',{name:posId,pos_id:posId,adherence:adh,aht,agent_type:TYPE});
   document.getElementById('a-pos').value='';
   document.getElementById('a-adh').value='';
   document.getElementById('a-aht').value='';
   await renderAdminRanking();
-  document.getElementById('a-name').focus();
+  document.getElementById('a-pos').focus();
 }
 
 function updateAgent(id,adh,aht) {
@@ -550,6 +547,7 @@ function updateAgent(id,adh,aht) {
 async function delAgent(id) {
   if (!confirm('Remove this agent?')) return;
   await api(`/agents?id=${id}`,'DELETE');
+  showToast('Agent removed', 'warn');
   await renderAdminRanking();
 }
 
@@ -582,13 +580,14 @@ async function renderAdminShifts() {
 async function addShift() {
   const name = document.getElementById('s-name').value.trim();
   if (!name) return;
-  try { await api('/shifts','POST',{name,shift_type:TYPE}); document.getElementById('s-name').value=''; await renderAdminShifts(); document.getElementById('s-name').focus(); }
+  try { await api('/shifts','POST',{name,shift_type:TYPE}); document.getElementById('s-name').value=''; await renderAdminShifts(); showToast('✓ Shift added!'); document.getElementById('s-name').focus(); }
   catch(e) { alert(e.message); }
 }
 
 async function delShift(id) {
   if (!confirm('Remove this shift?')) return;
   await api(`/shifts?id=${id}`,'DELETE');
+  showToast('Shift removed', 'warn');
   await renderAdminShifts();
 }
 
@@ -620,7 +619,7 @@ async function renderAdminBids() {
         return `<div class="bid-card">
           <div class="bid-head">
             <div class="rank-num ${rankClass(i)}" style="flex-shrink:0">${i+1}</div>
-            <span class="bid-name">${a.name}</span>
+            <span class="bid-name">${a.pos_id||a.name}</span>
             <span class="bid-score">Adh: ${a.adherence}% · AHT: ${a.aht}s</span>
           </div>
           <div class="prefs">
@@ -649,6 +648,7 @@ function saveBid(agentId) {
     const sels = document.querySelectorAll(`select[data-agent="${agentId}"]`);
     const [p1,p2,p3] = [...sels].map(s=>parseInt(s.value)||null);
     await api('/bids','POST',{agent_id:agentId,pref1_shift_id:p1,pref2_shift_id:p2,pref3_shift_id:p3});
+    showToast('✓ Bid saved!');
   }, 400);
 }
 
@@ -698,8 +698,8 @@ async function renderLiveView(paneId) {
             <span>${s.name}</span>
             ${others.length?`<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">Contested</span>`:''}
           </div>
-          ${winner?`<div class="live-winner"><span style="font-size:14px">👑</span><span class="live-winner-name">${winner.name}</span><span class="live-winner-score">${winner.adherence}%</span></div>`:`<div class="live-empty">No bids yet</div>`}
-          ${others.slice(0,3).map(c=>`<div class="live-contender"><div class="contested-dot"></div><span class="live-contender-name">${c.agent.name}</span><span class="live-contender-score">${c.agent.adherence}% · ${c.pref}${c.pref===1?'st':c.pref===2?'nd':'rd'}</span></div>`).join('')}
+          ${winner?`<div class="live-winner"><span style="font-size:14px">👑</span><span class="live-winner-name">${winner.pos_id||winner.name}</span><span class="live-winner-score">${winner.adherence}%</span></div>`:`<div class="live-empty">No bids yet</div>`}
+          ${others.slice(0,3).map(c=>`<div class="live-contender"><div class="contested-dot"></div><span class="live-contender-name">${c.agent.pos_id||c.agent.name}</span><span class="live-contender-score">${c.agent.adherence}% · ${c.pref}${c.pref===1?'st':c.pref===2?'nd':'rd'}</span></div>`).join('')}
           ${others.length>3?`<div style="font-size:11px;color:var(--text3);padding:4px 9px">+${others.length-3} more</div>`:''}
         </div>`;
       }).join('')}
@@ -726,7 +726,7 @@ async function renderAdminResults() {
         ${results.map((r,i)=>`
           <div class="res-row">
             <div class="rank-num ${rankClass(i)}">${i+1}</div>
-            <span style="flex:1;font-weight:500;font-size:13px">${r.agent_name}</span>
+            <span style="flex:1;font-weight:500;font-size:13px">${r.pos_id||r.agent_name}</span>
             <span style="font-size:11px;color:var(--text3);min-width:58px">${r.adherence}% adh</span>
             ${r.shift_name?`<span class="shift-pill">${r.shift_name}</span>`:`<span class="no-shift">Unassigned</span>`}
             ${r.preference_used?`<span class="pref-note">${r.preference_used}${r.preference_used===1?'st':r.preference_used===2?'nd':'rd'} choice</span>`:''}
@@ -737,6 +737,7 @@ async function renderAdminResults() {
 
 async function runAssignment() {
   await api('/results','POST',{type:TYPE});
+  showToast('✓ Assignment complete!');
   await renderAdminResults();
 }
 
@@ -787,7 +788,7 @@ async function viewArchive(id) {
       ${data.results.map((r,i)=>`
         <div class="res-row">
           <div class="rank-num ${rankClass(i)}">${i+1}</div>
-          <span style="flex:1;font-weight:500;font-size:13px">${r.agent_name}</span>
+          <span style="flex:1;font-weight:500;font-size:13px">${r.pos_id||r.agent_name}</span>
           <span style="font-size:11px;color:var(--text3)">${r.adherence}% adh</span>
           ${r.shift_name?`<span class="shift-pill">${r.shift_name}</span>`:`<span class="no-shift">Unassigned</span>`}
         </div>`).join('')}
@@ -823,7 +824,7 @@ function renderAgentShell() {
     pill.className = 'user-pill';
     document.getElementById('hd-right').appendChild(pill);
   }
-  pill.innerHTML = `${currentAgent.name} <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
+  pill.innerHTML = `${currentAgent.pos_id||currentAgent.name} <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
 
   document.getElementById('screen-agent').innerHTML = `
     <div class="nav">
@@ -868,7 +869,7 @@ async function renderAgentBid() {
         ? `<div class="bidding-closed-banner"><h3>🔴 Bidding is closed</h3><p>Your TL will open bidding shortly.</p></div>`
         : `<div class="bidding-open-banner"><p>🟢 Bidding is open — select your shift preferences below.</p></div>`}
       <div class="agent-bid-card">
-        <div class="agent-name-display">${currentAgent.name}</div>
+        <div class="agent-name-display">${currentAgent.pos_id||currentAgent.name}</div>
         <div class="agent-rank-display">Rank #${myRank} · Adherence: ${currentAgent.adherence}% · AHT: ${currentAgent.aht}s</div>
 
         <div class="agent-pref-item">
@@ -908,6 +909,7 @@ async function saveAgentBid() {
   try {
     await api('/bids','POST',{agent_id:currentAgent.id,pref1_shift_id:p1,pref2_shift_id:p2,pref3_shift_id:p3});
     msgEl.innerHTML='<span style="color:var(--green)">✓ Preferences saved!</span>';
+    showToast('✓ Bid saved!');
     setTimeout(()=>msgEl.innerHTML='',3000);
   } catch(e) { msgEl.innerHTML=`<span style="color:var(--red)">Error saving. Try again.</span>`; }
 }
@@ -923,6 +925,15 @@ function renderPE(paneId) {
         <span class="wip-pill">Work in progress</span>
       </div>
     </div>`;
+}
+
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  const bg = type==='error' ? 'var(--red)' : type==='warn' ? 'var(--amber)' : 'var(--p700)';
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:500;font-family:'IBM Plex Sans',sans-serif;box-shadow:0 4px 16px rgba(30,10,60,.25);z-index:9999;opacity:1;transition:opacity .3s`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 2200);
 }
 
 init();
