@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       if (!name) return res.status(400).json({ error: 'Name required' });
       const [agent] = await sql`
         INSERT INTO agents (name, adherence, aht, agent_type, pos_id)
-        VALUES (${name}, ${adherence || 0}, ${aht || 0}, ${agent_type}, ${pos_id || null})
+        VALUES (${name}, ${parseFloat(adherence) || 0}, ${parseInt(aht) || 0}, ${agent_type}, ${pos_id || null})
         RETURNING *
       `;
       return res.status(201).json(agent);
