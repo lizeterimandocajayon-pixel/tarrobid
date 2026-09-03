@@ -401,7 +401,7 @@ function renderAdminShell() {
   if (!pill) {
     pill = document.createElement('span');
     pill.className = 'user-pill';
-    pill.innerHTML = `Admin <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
+    pill.innerHTML = `Admin <button class="logout-btn" onclick="refreshAdmin()" title="Refresh">↺</button> <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
     document.getElementById('hd-right').appendChild(pill);
   }
 
@@ -430,6 +430,7 @@ function goAdmin(tab) {
   ['ranking','shifts','bids','live','results','archive','pe'].forEach(t => {
     document.getElementById('apane-'+t).style.display = t===tab ? 'block' : 'none';
   });
+  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer = null; }
   if (tab==='ranking') renderAdminRanking();
   if (tab==='shifts')  renderAdminShifts();
   if (tab==='bids')    renderAdminBids();
@@ -707,51 +708,86 @@ async function renderLiveView(paneId) {
 }
 
 // ── ADMIN: RESULTS ────────────────────────
+let resultsTimer = null;
+
 async function renderAdminResults() {
+  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer = null; }
+  await refreshResults();
+  // Auto-refresh every 5s while on results tab
+  resultsTimer = setInterval(async () => {
+    if (adminTab === 'results') await refreshResults();
+    else { clearInterval(resultsTimer); resultsTimer = null; }
+  }, 5000);
+}
+
+async function refreshResults() {
   const el = document.getElementById('apane-results');
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span>Loading…</div>';
-  const results = await api(`/results?type=${TYPE}`);
-  const unassigned = results.filter(r=>!r.shift_name).length;
+  if (!el) return;
+  // Auto-compute assignment from current bids
+  const [agents, shifts, bids] = await Promise.all([
+    api(`/agents?type=${TYPE}`),
+    api(`/shifts?type=${TYPE}`),
+    api(`/bids?type=${TYPE}`),
+  ]);
+  // Run assignment in-memory (no DB write needed for live view)
+  const sorted = [...agents]; // already sorted by API
+  const taken = new Set();
+  const results = sorted.map(agent => {
+    const b = bids.find(b => b.agent_id === agent.id) || {};
+    let shiftName = null; let prefUsed = null;
+    for (const [col, pref] of [['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]]) {
+      const sid = b[col];
+      if (sid && !taken.has(sid)) {
+        const shift = shifts.find(s => s.id === sid);
+        if (shift) { taken.add(sid); shiftName = shift.name; prefUsed = pref; break; }
+      }
+    }
+    return { agent, shiftName, prefUsed };
+  });
+  const unassigned = results.filter(r => !r.shiftName).length;
+  const lastUpdate = new Date().toLocaleTimeString();
   el.innerHTML = `
     <div class="card">
       <div class="card-head">
-        <span class="card-title">Assignment results — PA</span>
-        ${results.length?`<button class="btn-ghost" onclick="exportCSV()">↓ Export CSV</button>`:''}
+        <span class="card-title">Live assignment — PA</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text3)">Updated ${lastUpdate}</span>
+          <button class="btn-ghost" onclick="exportResultsCSV()" style="height:30px;font-size:11px">↓ Export CSV</button>
+          <button class="btn-primary" onclick="saveAssignment()" style="height:30px;font-size:11px">💾 Save final</button>
+        </div>
       </div>
-      <div class="btn-row">
-        <button class="btn-primary" onclick="runAssignment()">Run assignment</button>
-      </div>
-      ${results.length ? `
-        ${unassigned?`<div class="warn">⚠ ${unassigned} agent(s) unassigned.</div>`:''}
-        ${results.map((r,i)=>`
-          <div class="res-row">
-            <div class="rank-num ${rankClass(i)}">${i+1}</div>
-            <span style="flex:1;font-weight:500;font-size:13px">${r.pos_id||r.agent_name}</span>
-            <span style="font-size:11px;color:var(--text3);min-width:58px">${r.adherence}% adh</span>
-            ${r.shift_name?`<span class="shift-pill">${r.shift_name}</span>`:`<span class="no-shift">Unassigned</span>`}
-            ${r.preference_used?`<span class="pref-note">${r.preference_used}${r.preference_used===1?'st':r.preference_used===2?'nd':'rd'} choice</span>`:''}
-          </div>`).join('')}
-      ` : '<div class="empty">Hit "Run assignment" to generate results.</div>'}
+      <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Auto-updates every 5s as agents bid. Hit "Save final" to lock results.</p>
+      ${unassigned ? `<div class="warn">⚠ ${unassigned} agent(s) unassigned.</div>` : `<div class="success-msg">✓ All agents assigned.</div>`}
+      ${results.map((r,i) => `
+        <div class="res-row">
+          <div class="rank-num ${rankClass(i)}">${i+1}</div>
+          <span style="flex:1;font-weight:500;font-size:13px">${r.agent.pos_id||r.agent.name}</span>
+          <span style="font-size:11px;color:var(--text3);min-width:58px">${r.agent.adherence}% adh</span>
+          ${r.shiftName ? `<span class="shift-pill">${r.shiftName}</span>` : `<span class="no-shift">Unassigned</span>`}
+          ${r.prefUsed ? `<span class="pref-note">${r.prefUsed}${r.prefUsed===1?'st':r.prefUsed===2?'nd':'rd'} choice</span>` : ''}
+        </div>`).join('')}
     </div>`;
+  // Store current results for CSV export
+  window._lastResults = results;
 }
 
-async function runAssignment() {
+async function saveAssignment() {
   await api('/results','POST',{type:TYPE});
-  showToast('✓ Assignment complete!');
-  await renderAdminResults();
+  showToast('✓ Results saved!');
 }
 
-function exportCSV() {
-  const rows = document.querySelectorAll('.res-row');
+function exportResultsCSV() {
+  if (!window._lastResults) return;
   let csv = 'Rank,Agent,Adherence %,Shift,Preference\n';
-  rows.forEach((row,i) => {
-    const cells=[...row.querySelectorAll('span,div')].map(e=>e.textContent.trim());
-    csv+=`"${i+1}","${cells[1]||''}","${cells[2]||''}","${cells[3]||''}","${cells[4]||''}"\n`;
+  window._lastResults.forEach((r,i) => {
+    csv += `"${i+1}","${r.agent.pos_id||r.agent.name}","${r.agent.adherence}","${r.shiftName||'Unassigned'}","${r.prefUsed ? r.prefUsed+(r.prefUsed===1?'st':r.prefUsed===2?'nd':'rd')+' choice' : '—'}"\n`;
   });
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='tarrobid_results.csv';a.click();
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'tarrobid_results.csv'; a.click();
 }
+
+
 
 // ── ADMIN: ARCHIVE ────────────────────────
 async function renderAdminArchive() {
@@ -824,7 +860,7 @@ function renderAgentShell() {
     pill.className = 'user-pill';
     document.getElementById('hd-right').appendChild(pill);
   }
-  pill.innerHTML = `${currentAgent.pos_id||currentAgent.name} <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
+  pill.innerHTML = `${currentAgent.pos_id||currentAgent.name} <button class="logout-btn" onclick="refreshAgent()" title="Refresh">↺</button> <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
 
   document.getElementById('screen-agent').innerHTML = `
     <div class="nav">
@@ -891,6 +927,7 @@ async function renderAgentBid() {
           </select>
         </div>
         <button class="agent-save-btn" onclick="saveAgentBid()" ${locked?'disabled':''}>Save my preferences</button>
+        ${!locked ? '<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">You can update your preferences anytime while bidding is open.</p>' : ''}
         <div id="agent-bid-msg" style="margin-top:10px;font-size:12px;text-align:center"></div>
       </div>
     </div>`;
@@ -925,6 +962,16 @@ function renderPE(paneId) {
         <span class="wip-pill">Work in progress</span>
       </div>
     </div>`;
+}
+
+function refreshAdmin() {
+  if (adminTab) goAdmin(adminTab);
+  showToast('Refreshed');
+}
+
+function refreshAgent() {
+  if (currentAgent) renderAgentBid();
+  showToast('Refreshed');
 }
 
 function showToast(msg, type='success') {
