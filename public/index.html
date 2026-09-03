@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TarroBid — Pizza Voice Ops</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --p900:#1e0a3c;--p800:#2d1260;--p700:#3d1a82;--p600:#5227a8;
+  --p500:#6d3dc7;--p400:#8f5ee0;--p300:#b48cf0;--p200:#d8bffa;--p100:#f0e6ff;--p50:#f9f5ff;
+  --green:#10b981;--amber:#f59e0b;--red:#ef4444;
+  --bg:#f5f0ff;--card:#fff;--border:#ddd0f5;
+  --text:#1e0a3c;--text2:#5a4a7a;--text3:#9b88bb;
+  --r:10px;--sh:0 1px 3px rgba(30,10,60,.07),0 4px 14px rgba(30,10,60,.07);
+}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;line-height:1.5}
+.shell{max-width:920px;margin:0 auto;padding:24px 18px 60px}
+
+/* Header */
+.hd{display:flex;align-items:center;gap:13px;margin-bottom:24px}
+.logo{width:42px;height:42px;background:linear-gradient(135deg,var(--p700),var(--p500));border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-t{font-size:16px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+.hd-title{font-size:20px;font-weight:700;color:var(--p900);letter-spacing:-0.3px}
+.hd-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.hd-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pa-badge{font-size:11px;font-weight:600;background:var(--p500);color:#fff;padding:4px 12px;border-radius:20px}
+.wip-badge{font-size:11px;font-weight:500;background:var(--p100);color:var(--p600);padding:4px 12px;border-radius:20px}
+
+/* Nav */
+.nav{display:flex;background:var(--p900);border-radius:var(--r);padding:4px;gap:2px;margin-bottom:24px;flex-wrap:wrap}
+.ntab{flex:1;min-width:80px;padding:8px 6px;font-size:12px;font-weight:500;color:rgba(255,255,255,.45);border:none;background:none;cursor:pointer;border-radius:7px;transition:all .15s;text-align:center;line-height:1.3;font-family:'IBM Plex Sans',sans-serif}
+.ntab.active{background:#fff;color:var(--p800)}
+.ntab:hover:not(.active){color:#fff;background:rgba(255,255,255,.1)}
+.ntab .wip-tag{display:block;font-size:9px;font-weight:400;opacity:.65;margin-top:1px}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);padding:20px;margin-bottom:14px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.card-title{font-size:14px;font-weight:600;color:var(--p900)}
+.cnt-badge{font-size:11px;font-weight:500;background:var(--p100);border:1px solid var(--p200);border-radius:12px;padding:2px 10px;color:var(--p600)}
+
+/* Forms */
+.add-bar{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap}
+.add-bar input{height:38px;padding:0 12px;border:1px solid var(--border);border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--text);background:#fff;outline:none;min-width:0}
+.add-bar input:focus{border-color:var(--p400);box-shadow:0 0 0 3px rgba(109,61,199,.1)}
+.add-bar input::placeholder{color:var(--text3)}
+.f1{flex:1}.fw82{flex:0 0 82px}
+.btn-add{height:38px;padding:0 16px;background:var(--p700);color:#fff;border:none;border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.btn-add:hover{background:var(--p600)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:8px 11px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);letter-spacing:.3px;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:last-child{border-bottom:none}
+tbody td{padding:10px 11px;vertical-align:middle}
+tbody tr:hover{background:var(--p50)}
+.rank-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:var(--p100);border:1px solid var(--p200);color:var(--p600);flex-shrink:0}
+.rank-num.top{background:var(--p700);border-color:var(--p700);color:#fff}
+.rank-num.s2{background:var(--p200);border-color:var(--p300);color:var(--p800)}
+.rank-num.s3{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+.metric-input{width:74px;height:30px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;text-align:center;color:var(--text);outline:none}
+.metric-input:focus{border-color:var(--p400)}
+.del-btn{border:none;background:none;cursor:pointer;color:var(--text3);font-size:19px;padding:0 4px;line-height:1}
+.del-btn:hover{color:var(--red)}
+.tie-tag{font-size:10px;font-weight:500;background:var(--p100);color:var(--p600);padding:2px 7px;border-radius:4px;margin-left:6px}
+
+/* Shifts */
+.shift-row{display:flex;align-items:center;gap:10px;padding:10px 13px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.shift-name{flex:1;font-size:13px;font-weight:500}
+
+/* Bids */
+.bid-card{background:var(--p50);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:8px}
+.bid-head{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.bid-name{flex:1;font-weight:600;font-size:13px;color:var(--p900)}
+.bid-score{font-size:11px;color:var(--text3)}
+.prefs{display:flex;gap:8px;flex-wrap:wrap}
+.pref-item{display:flex;flex-direction:column;gap:4px;min-width:116px}
+.pref-lbl{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;align-self:flex-start;letter-spacing:.3px}
+.p1-lbl{background:var(--p200);color:var(--p800)}
+.p2-lbl{background:var(--p100);color:var(--p700)}
+.p3-lbl{background:#ede9fe;color:#5b21b6}
+.pref-sel{height:32px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;color:var(--text);background:#fff;cursor:pointer;outline:none}
+.pref-sel:focus{border-color:var(--p400)}
+
+/* Live view */
+.live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.live-card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px}
+.live-shift-head{font-size:13px;font-weight:600;color:var(--p900);margin-bottom:9px;padding-bottom:9px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:6px}
+.live-winner{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;background:var(--p50);border:1px solid var(--p200);margin-bottom:5px}
+.live-winner-name{flex:1;font-size:12px;font-weight:600;color:var(--p700)}
+.live-winner-score{font-size:11px;color:var(--p500);font-weight:500}
+.live-contender{display:flex;align-items:center;gap:8px;padding:5px 9px;border-radius:6px;background:var(--bg);margin-bottom:3px}
+.live-contender-name{flex:1;font-size:12px;color:var(--text2)}
+.live-contender-score{font-size:11px;color:var(--text3)}
+.live-empty{font-size:12px;color:var(--text3);font-style:italic;padding:4px 0}
+.contested-dot{width:7px;height:7px;border-radius:50%;background:var(--amber);flex-shrink:0}
+
+/* Results */
+.res-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#fff;flex-wrap:wrap}
+.shift-pill{font-size:11px;font-weight:600;padding:3px 12px;border-radius:20px;background:var(--p200);color:var(--p800)}
+.no-shift{font-size:11px;color:var(--text3);font-style:italic}
+.pref-note{font-size:11px;color:var(--text3)}
+
+/* Buttons */
+.btn-primary{height:38px;padding:0 18px;background:var(--p700);color:#fff;border:none;border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.btn-primary:hover{background:var(--p600)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+.btn-ghost{height:34px;padding:0 13px;background:none;color:var(--text2);border:1px solid var(--border);border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;cursor:pointer}
+.btn-ghost:hover{background:var(--p50)}
+.btn-danger{height:34px;padding:0 13px;background:none;color:var(--red);border:1px solid #fca5a5;border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;cursor:pointer}
+.btn-danger:hover{background:#fef2f2}
+.btn-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+
+/* Stats */
+.stats{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stat{flex:1;min-width:100px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+.stat-v{font-size:22px;font-weight:700;color:var(--p800);letter-spacing:-.5px}
+.stat-l{font-size:11px;color:var(--text3);margin-top:2px;letter-spacing:.2px}
+
+/* Misc */
+.empty{padding:30px;text-align:center;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:8px;line-height:1.7}
+.warn{background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:12px}
+.success-msg{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:12px;color:#166534;margin-bottom:12px}
+.info-msg{background:var(--p50);border:1px solid var(--p200);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--p700);margin-bottom:12px}
+
+/* Reset modal */
+.modal-bg{position:fixed;inset:0;background:rgba(30,10,60,.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal{background:#fff;border-radius:14px;padding:28px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(30,10,60,.2)}
+.modal-title{font-size:16px;font-weight:700;color:var(--p900);margin-bottom:6px}
+.modal-desc{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6}
+.modal-input{width:100%;height:40px;padding:0 13px;border:1px solid var(--border);border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:14px;color:var(--text);outline:none;margin-bottom:16px}
+.modal-input:focus{border-color:var(--p400)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+
+/* Archive */
+.archive-row{display:flex;align-items:center;gap:12px;padding:10px 13px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:6px}
+.archive-month{flex:1;font-weight:500;font-size:13px}
+.archive-date{font-size:11px;color:var(--text3)}
+.archive-type{font-size:11px;font-weight:600;background:var(--p100);color:var(--p600);padding:2px 8px;border-radius:10px}
+
+/* WIP */
+.wip-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 20px;text-align:center}
+.wip-icon{font-size:52px;margin-bottom:18px}
+.wip-title{font-size:18px;font-weight:600;color:var(--p900);margin-bottom:8px}
+.wip-desc{font-size:13px;color:var(--text3);max-width:320px;line-height:1.7}
+.wip-pill{display:inline-block;font-size:11px;font-weight:600;background:var(--p100);color:var(--p600);padding:4px 14px;border-radius:20px;margin-top:18px}
+
+/* Loading */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--p500);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-row{padding:20px;text-align:center;color:var(--text3);font-size:13px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="hd">
+    <div class="logo"><span class="logo-t">TB</span></div>
+    <div>
+      <div class="hd-title">TarroBid</div>
+      <div class="hd-sub">Pizza Voice Ops · Shift Bidding</div>
+    </div>
+    <div class="hd-right">
+      <span class="pa-badge">PA Bidding</span>
+      <span class="wip-badge">PE — coming soon</span>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="ntab active" onclick="go('ranking')">Ranking</button>
+    <button class="ntab" onclick="go('shifts')">Shifts</button>
+    <button class="ntab" onclick="go('bids')">Bids</button>
+    <button class="ntab" onclick="go('live')">Live View</button>
+    <button class="ntab" onclick="go('results')">Results</button>
+    <button class="ntab" onclick="go('archive')">Archive</button>
+    <button class="ntab" onclick="go('pe')">PE Bidding<span class="wip-tag">Work in progress</span></button>
+  </div>
+
+  <div id="pane-ranking"></div>
+  <div id="pane-shifts" style="display:none"></div>
+  <div id="pane-bids" style="display:none"></div>
+  <div id="pane-live" style="display:none"></div>
+  <div id="pane-results" style="display:none"></div>
+  <div id="pane-archive" style="display:none"></div>
+  <div id="pane-pe" style="display:none"></div>
+</div>
+
+<!-- Reset modal -->
+<div id="reset-modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Archive &amp; reset for next month</div>
+    <div class="modal-desc">This will save this month's full results to the archive, then clear all bids, results, and shifts. Agents stay — update their scores next month.</div>
+    <input class="modal-input" id="month-label" placeholder="e.g. September 2026" />
+    <div id="reset-msg" style="margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeReset()">Cancel</button>
+      <button class="btn-danger" onclick="doReset()">Archive &amp; reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const TYPE = 'PA';
+let cur = 'ranking';
+let liveTimer = null;
+let cache = { agents: null, shifts: null, results: null };
+
+const panes = ['ranking','shifts','bids','live','results','archive','pe'];
+
+function go(tab) {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  cur = tab;
+  panes.forEach((t, i) => {
+    document.getElementById('pane-' + t).style.display = t === tab ? 'block' : 'none';
+    document.querySelectorAll('.ntab')[i].classList.toggle('active', t === tab);
+  });
+  render();
+  if (tab === 'live') liveTimer = setInterval(renderLive, 4000);
+}
+
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function loading(pane) {
+  document.getElementById('pane-' + pane).innerHTML =
+    '<div class="loading-row"><span class="spinner"></span>Loading…</div>';
+}
+
+function rankClass(i) { return i === 0 ? 'top' : i === 1 ? 's2' : i === 2 ? 's3' : ''; }
+
+async function render() {
+  if (cur === 'ranking') await renderRanking();
+  if (cur === 'shifts')  await renderShifts();
+  if (cur === 'bids')    await renderBids();
+  if (cur === 'live')    await renderLive();
+  if (cur === 'results') await renderResults();
+  if (cur === 'archive') await renderArchive();
+  if (cur === 'pe')      renderPE();
+}
+
+/* ── RANKING ─────────────────────────────── */
+async function renderRanking() {
+  loading('ranking');
+  const [agents, shifts, bids] = await Promise.all([
+    api(`/agents?type=${TYPE}`),
+    api(`/shifts?type=${TYPE}`),
+    api(`/bids?type=${TYPE}`),
+  ]);
+  cache.agents = agents; cache.shifts = shifts;
+
+  const shiftMap = Object.fromEntries(shifts.map(s => [s.id, s]));
+  const bidMap = Object.fromEntries(bids.map(b => [b.agent_id, b]));
+  const bidsPlaced = bids.length;
+
+  const el = document.getElementById('pane-ranking');
+  el.innerHTML = `
+    <div class="stats">
+      <div class="stat"><div class="stat-v">${agents.length}</div><div class="stat-l">Total PAs</div></div>
+      <div class="stat"><div class="stat-v">${shifts.length}</div><div class="stat-l">Shifts available</div></div>
+      <div class="stat"><div class="stat-v">${bidsPlaced}</div><div class="stat-l">Bids placed</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">PA Adherence Ranking</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="cnt-badge">${agents.length} agents</span>
+          <button class="btn-danger" onclick="openReset()" style="height:30px;font-size:11px">↺ New month</button>
+        </div>
+      </div>
+      <div class="add-bar">
+        <input class="f1" id="a-name" placeholder="Agent name" />
+        <input class="fw82" id="a-adh" placeholder="Adh %" type="number" min="0" max="100" step="0.01" />
+        <input class="fw82" id="a-aht" placeholder="AHT (s)" type="number" min="0" step="1" />
+        <button class="btn-add" onclick="addAgent()">+ Add</button>
+      </div>
+      ${!agents.length ? '<div class="empty">No agents yet.<br>Add your first PA above.</div>' : `
+      <table>
+        <thead><tr>
+          <th style="width:36px">#</th>
+          <th>Agent</th>
+          <th>Adherence %</th>
+          <th>AHT (s)</th>
+          <th>1st bid</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+        ${agents.map((a, i) => {
+          const isTie = i > 0 && agents[i-1].adherence === a.adherence;
+          const bid = bidMap[a.id];
+          const s1 = bid && bid.pref1_shift_id ? shiftMap[bid.pref1_shift_id] : null;
+          return `<tr>
+            <td><div class="rank-num ${rankClass(i)}">${i+1}</div></td>
+            <td style="font-weight:500">${a.name}${isTie ? '<span class="tie-tag">AHT tb</span>' : ''}</td>
+            <td><input class="metric-input" type="number" min="0" max="100" step="0.01" value="${a.adherence}"
+              onchange="updateAgent(${a.id},this.value,null)" /></td>
+            <td><input class="metric-input" type="number" min="0" step="1" value="${a.aht}"
+              onchange="updateAgent(${a.id},null,this.value)" /></td>
+            <td>${s1 ? `<span class="shift-pill">${s1.name}</span>` : '<span style="font-size:12px;color:var(--text3)">—</span>'}</td>
+            <td><button class="del-btn" onclick="delAgent(${a.id})">×</button></td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>`}
+    </div>`;
+
+  document.getElementById('a-name').addEventListener('keydown', e => e.key === 'Enter' && addAgent());
+}
+
+async function addAgent() {
+  const name = document.getElementById('a-name').value.trim();
+  const adh  = parseFloat(document.getElementById('a-adh').value);
+  const aht  = parseFloat(document.getElementById('a-aht').value);
+  if (!name || isNaN(adh) || isNaN(aht)) return;
+  await api('/agents', 'POST', { name, adherence: adh, aht, agent_type: TYPE });
+  document.getElementById('a-name').value = '';
+  document.getElementById('a-adh').value = '';
+  document.getElementById('a-aht').value = '';
+  await renderRanking();
+  document.getElementById('a-name').focus();
+}
+
+let updateTimers = {};
+function updateAgent(id, adh, aht) {
+  clearTimeout(updateTimers[id]);
+  updateTimers[id] = setTimeout(async () => {
+    const agent = cache.agents?.find(a => a.id === id);
+    if (!agent) return;
+    await api(`/agents?id=${id}`, 'PUT', {
+      adherence: adh !== null ? parseFloat(adh) : agent.adherence,
+      aht: aht !== null ? parseFloat(aht) : agent.aht,
+    });
+    await renderRanking();
+  }, 600);
+}
+
+async function delAgent(id) {
+  if (!confirm('Remove this agent?')) return;
+  await api(`/agents?id=${id}`, 'DELETE');
+  await renderRanking();
+}
+
+/* ── SHIFTS ──────────────────────────────── */
+async function renderShifts() {
+  loading('shifts');
+  const shifts = await api(`/shifts?type=${TYPE}`);
+  cache.shifts = shifts;
+  const el = document.getElementById('pane-shifts');
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Available shifts</span>
+        <span class="cnt-badge">${shifts.length} shifts</span>
+      </div>
+      <div class="add-bar">
+        <input class="f1" id="s-name" placeholder="e.g. Mon–Fri 6AM–2PM" />
+        <button class="btn-add" onclick="addShift()">+ Add shift</button>
+      </div>
+      ${!shifts.length ? '<div class="empty">No shifts yet.<br>Add the available shifts for this month.</div>' :
+        shifts.map(s => `
+          <div class="shift-row">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span class="shift-name">${s.name}</span>
+            <button class="del-btn" onclick="delShift(${s.id})">×</button>
+          </div>`).join('')}
+    </div>`;
+  document.getElementById('s-name').addEventListener('keydown', e => e.key === 'Enter' && addShift());
+}
+
+async function addShift() {
+  const name = document.getElementById('s-name').value.trim();
+  if (!name) return;
+  try {
+    await api('/shifts', 'POST', { name, shift_type: TYPE });
+    document.getElementById('s-name').value = '';
+    await renderShifts();
+    document.getElementById('s-name').focus();
+  } catch (e) { alert(e.message); }
+}
+
+async function delShift(id) {
+  if (!confirm('Remove this shift?')) return;
+  await api(`/shifts?id=${id}`, 'DELETE');
+  await renderShifts();
+}
+
+/* ── BIDS ────────────────────────────────── */
+async function renderBids() {
+  loading('bids');
+  const [agents, shifts, bids] = await Promise.all([
+    api(`/agents?type=${TYPE}`),
+    api(`/shifts?type=${TYPE}`),
+    api(`/bids?type=${TYPE}`),
+  ]);
+  if (!agents.length || !shifts.length) {
+    document.getElementById('pane-bids').innerHTML =
+      '<div class="card"><div class="empty">Add agents and shifts first,<br>then come back to place bids.</div></div>';
+    return;
+  }
+  const bidMap = Object.fromEntries(bids.map(b => [b.agent_id, b]));
+  const opts = shifts.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  const el = document.getElementById('pane-bids');
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">PA Bids — 3 preferences each</span>
+        <span class="cnt-badge">${bids.length}/${agents.length} submitted</span>
+      </div>
+      ${agents.map((a, i) => {
+        const b = bidMap[a.id] || {};
+        return `<div class="bid-card">
+          <div class="bid-head">
+            <div class="rank-num ${rankClass(i)}" style="flex-shrink:0">${i+1}</div>
+            <span class="bid-name">${a.name}</span>
+            <span class="bid-score">Adh: ${a.adherence}% · AHT: ${a.aht}s</span>
+          </div>
+          <div class="prefs">
+            ${[['pref1_shift_id','1st choice','p1-lbl'],['pref2_shift_id','2nd choice','p2-lbl'],['pref3_shift_id','3rd choice','p3-lbl']].map(([col, lbl, cls]) => `
+              <div class="pref-item">
+                <span class="pref-lbl ${cls}">${lbl}</span>
+                <select class="pref-sel" data-agent="${a.id}" data-col="${col}" onchange="saveBid(${a.id})">
+                  <option value="">— pick a shift —</option>${opts}
+                </select>
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Restore saved bids
+  agents.forEach(a => {
+    const b = bidMap[a.id] || {};
+    ['pref1_shift_id','pref2_shift_id','pref3_shift_id'].forEach(col => {
+      if (b[col]) {
+        const sel = el.querySelector(`select[data-agent="${a.id}"][data-col="${col}"]`);
+        if (sel) sel.value = b[col];
+      }
+    });
+  });
+}
+
+let bidTimers = {};
+function saveBid(agentId) {
+  clearTimeout(bidTimers[agentId]);
+  bidTimers[agentId] = setTimeout(async () => {
+    const sels = document.querySelectorAll(`select[data-agent="${agentId}"]`);
+    const [p1, p2, p3] = [...sels].map(s => parseInt(s.value) || null);
+    await api('/bids', 'POST', {
+      agent_id: agentId,
+      pref1_shift_id: p1,
+      pref2_shift_id: p2,
+      pref3_shift_id: p3,
+    });
+  }, 400);
+}
+
+/* ── LIVE VIEW ───────────────────────────── */
+async function renderLive() {
+  const el = document.getElementById('pane-live');
+  const [agents, shifts, bids] = await Promise.all([
+    api(`/agents?type=${TYPE}`),
+    api(`/shifts?type=${TYPE}`),
+    api(`/bids?type=${TYPE}`),
+  ]);
+  if (!shifts.length) {
+    el.innerHTML = '<div class="card"><div class="empty">Add shifts to see the live board.</div></div>';
+    return;
+  }
+  const bidMap = Object.fromEntries(bids.map(b => [b.agent_id, b]));
+  const shiftMap = Object.fromEntries(shifts.map(s => [s.id, { shift: s, contenders: [] }]));
+
+  agents.forEach((a, rank) => {
+    const b = bidMap[a.id];
+    if (!b) return;
+    [['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]].forEach(([col, pref]) => {
+      const sid = b[col];
+      if (sid && shiftMap[sid]) shiftMap[sid].contenders.push({ agent: a, pref });
+    });
+  });
+
+  // Simulate assignment to find projected winners
+  const taken = new Set();
+  const winners = {};
+  agents.forEach(a => {
+    const b = bidMap[a.id] || {};
+    for (const col of ['pref1_shift_id','pref2_shift_id','pref3_shift_id']) {
+      const sid = b[col];
+      if (sid && !taken.has(sid)) { taken.add(sid); winners[sid] = a.id; break; }
+    }
+  });
+
+  const noBids = bids.length === 0;
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-head" style="margin-bottom:4px">
+        <span class="card-title">Live bid board — PA</span>
+        <span style="font-size:11px;color:var(--text3)">Auto-refreshes every 4s</span>
+      </div>
+      <p style="font-size:12px;color:var(--text3)">Purple = projected winner · Others listed below · Contested = multiple bidders</p>
+    </div>
+    ${noBids ? '<div class="empty">No bids placed yet.</div>' : ''}
+    <div class="live-grid">
+      ${shifts.map(s => {
+        const info = shiftMap[s.id];
+        const winnerId = winners[s.id];
+        const winner = winnerId ? agents.find(a => a.id === winnerId) : null;
+        const others = info.contenders.filter(c => c.agent.id !== winnerId);
+        return `<div class="live-card">
+          <div class="live-shift-head">
+            <span>${s.name}</span>
+            ${others.length ? `<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">Contested</span>` : ''}
+          </div>
+          ${winner
+            ? `<div class="live-winner">
+                <span style="font-size:14px">👑</span>
+                <span class="live-winner-name">${winner.name}</span>
+                <span class="live-winner-score">${winner.adherence}%</span>
+               </div>`
+            : `<div class="live-empty">No bids yet</div>`}
+          ${others.slice(0,3).map(c => `
+            <div class="live-contender">
+              <div class="contested-dot"></div>
+              <span class="live-contender-name">${c.agent.name}</span>
+              <span class="live-contender-score">${c.agent.adherence}% · ${c.pref}${c.pref===1?'st':c.pref===2?'nd':'rd'}</span>
+            </div>`).join('')}
+          ${others.length > 3 ? `<div style="font-size:11px;color:var(--text3);padding:4px 9px">+${others.length-3} more bidding</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+/* ── RESULTS ─────────────────────────────── */
+async function renderResults() {
+  loading('results');
+  const results = await api(`/results?type=${TYPE}`);
+  const el = document.getElementById('pane-results');
+  const unassigned = results.filter(r => !r.shift_name).length;
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Assignment results — PA</span>
+        ${results.length ? `<button class="btn-ghost" onclick="exportCSV()">↓ Export CSV</button>` : ''}
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="runAssignment()">Run assignment</button>
+        ${results.length ? `<button class="btn-ghost" onclick="clearResults()">Clear</button>` : ''}
+      </div>
+      ${results.length ? `
+        ${unassigned ? `<div class="warn">⚠ ${unassigned} agent(s) unassigned — no bid matched. Assign manually.</div>` : ''}
+        ${results.map((r, i) => `
+          <div class="res-row">
+            <div class="rank-num ${rankClass(i)}">${i+1}</div>
+            <span style="flex:1;font-weight:500;font-size:13px">${r.agent_name}</span>
+            <span style="font-size:11px;color:var(--text3);min-width:58px">${r.adherence}% adh</span>
+            ${r.shift_name
+              ? `<span class="shift-pill">${r.shift_name}</span>`
+              : `<span class="no-shift">Unassigned</span>`}
+            ${r.preference_used ? `<span class="pref-note">${r.preference_used}${r.preference_used===1?'st':r.preference_used===2?'nd':'rd'} choice</span>` : ''}
+          </div>`).join('')}
+      ` : '<div class="empty">Hit "Run assignment" to generate results.</div>'}
+    </div>`;
+}
+
+async function runAssignment() {
+  await api('/results', 'POST', { type: TYPE });
+  await renderResults();
+}
+
+async function clearResults() {
+  // Just re-run with no bids changes — clear by re-fetching
+  if (!confirm('Clear results?')) return;
+  await renderResults();
+}
+
+function exportCSV() {
+  const rows = document.querySelectorAll('.res-row');
+  let csv = 'Rank,Agent,Adherence %,Shift,Preference\n';
+  rows.forEach((row, i) => {
+    const cells = [...row.querySelectorAll('span,div')].map(e => e.textContent.trim());
+    csv += `"${i+1}","${cells[1] || ''}","${cells[2] || ''}","${cells[3] || ''}","${cells[4] || ''}"\n`;
+  });
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'tarrobid_results.csv';
+  a.click();
+}
+
+/* ── ARCHIVE ─────────────────────────────── */
+async function renderArchive() {
+  loading('archive');
+  const list = await api('/archive');
+  const el = document.getElementById('pane-archive');
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Past months</span>
+        <span class="cnt-badge">${list.length} archived</span>
+      </div>
+      ${!list.length
+        ? '<div class="empty">No archives yet.<br>Use "New month" on the Ranking tab to archive and reset.</div>'
+        : list.map(a => `
+          <div class="archive-row">
+            <span class="archive-month">${a.month_label}</span>
+            <span class="archive-type">${a.agent_type}</span>
+            <span class="archive-date">${new Date(a.archived_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+            <button class="btn-ghost" style="height:28px;font-size:11px" onclick="viewArchive(${a.id})">View</button>
+          </div>`).join('')}
+    </div>
+    <div id="archive-detail"></div>`;
+}
+
+async function viewArchive(id) {
+  const entry = await api(`/archive?id=${id}`);
+  const data = entry.data;
+  const el = document.getElementById('archive-detail');
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">${entry.month_label} — full results</span>
+        <button class="btn-ghost" onclick="document.getElementById('archive-detail').innerHTML=''">Close</button>
+      </div>
+      ${data.results.map((r, i) => `
+        <div class="res-row">
+          <div class="rank-num ${rankClass(i)}">${i+1}</div>
+          <span style="flex:1;font-weight:500;font-size:13px">${r.agent_name}</span>
+          <span style="font-size:11px;color:var(--text3)">${r.adherence}% adh</span>
+          ${r.shift_name
+            ? `<span class="shift-pill">${r.shift_name}</span>`
+            : `<span class="no-shift">Unassigned</span>`}
+        </div>`).join('')}
+    </div>`;
+}
+
+/* ── RESET ───────────────────────────────── */
+function openReset() {
+  // Pre-fill with next month
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  document.getElementById('month-label').value =
+    d.toLocaleString('default', { month: 'long' }) + ' ' + d.getFullYear();
+  document.getElementById('reset-msg').innerHTML = '';
+  document.getElementById('reset-modal').style.display = 'flex';
+}
+function closeReset() {
+  document.getElementById('reset-modal').style.display = 'none';
+}
+
+async function doReset() {
+  const label = document.getElementById('month-label').value.trim();
+  if (!label) { document.getElementById('month-label').focus(); return; }
+  const msgEl = document.getElementById('reset-msg');
+  msgEl.innerHTML = '<span class="spinner"></span>Archiving…';
+  try {
+    const res = await api('/reset', 'POST', { month_label: label, type: TYPE });
+    msgEl.innerHTML = `<div class="success-msg">✓ ${res.message}</div>`;
+    setTimeout(() => { closeReset(); go('ranking'); }, 1500);
+  } catch (e) {
+    msgEl.innerHTML = `<div class="warn">Error: ${e.message}</div>`;
+  }
+}
+
+/* ── PE ──────────────────────────────────── */
+function renderPE() {
+  document.getElementById('pane-pe').innerHTML = `
+    <div class="card">
+      <div class="wip-screen">
+        <div class="wip-icon">🚧</div>
+        <div class="wip-title">PE Bidding</div>
+        <div class="wip-desc">Pizza Expert shift bidding is being built. It will use the same ranking, bid preferences, and live board as PA bidding.</div>
+        <span class="wip-pill">Work in progress</span>
+      </div>
+    </div>`;
+}
+
+// Init
+go('ranking');
+</script>
+</body>
+</html>
