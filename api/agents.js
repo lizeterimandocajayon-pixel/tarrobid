@@ -22,11 +22,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { name, adherence, aht, agent_type = 'PA' } = req.body;
+      const { name, adherence, aht, agent_type = 'PA', pos_id } = req.body;
       if (!name) return res.status(400).json({ error: 'Name required' });
       const [agent] = await sql`
-        INSERT INTO agents (name, adherence, aht, agent_type)
-        VALUES (${name}, ${adherence || 0}, ${aht || 0}, ${agent_type})
+        INSERT INTO agents (name, adherence, aht, agent_type, pos_id)
+        VALUES (${name}, ${adherence || 0}, ${aht || 0}, ${agent_type}, ${pos_id || null})
         RETURNING *
       `;
       return res.status(201).json(agent);
@@ -36,10 +36,8 @@ export default async function handler(req, res) {
       const { id } = req.query;
       const { adherence, aht } = req.body;
       const [agent] = await sql`
-        UPDATE agents
-        SET adherence = ${adherence}, aht = ${aht}
-        WHERE id = ${id}
-        RETURNING *
+        UPDATE agents SET adherence = ${adherence}, aht = ${aht}
+        WHERE id = ${id} RETURNING *
       `;
       return res.status(200).json(agent);
     }

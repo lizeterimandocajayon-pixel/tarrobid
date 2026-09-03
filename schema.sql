@@ -48,3 +48,12 @@ CREATE TABLE IF NOT EXISTS archive (
   archived_at TIMESTAMPTZ DEFAULT NOW(),
   data JSONB NOT NULL -- full snapshot: agents, shifts, results
 );
+
+-- Add POS ID to agents (run this if agents table already exists)
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS pos_id TEXT;
+
+-- Settings table (for bidding open/close toggle)
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
