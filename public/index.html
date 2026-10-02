@@ -177,7 +177,7 @@ tbody tr:hover{background:var(--p50)}
       <div class="hd-sub">Pizza Voice Ops · Shift Bidding</div>
     </div>
     <div class="hd-right" id="hd-right">
-      <span id="type-badge" class="pa-badge">PA Bidding</span>
+      <span id="type-badge" class="wip-badge" style="background:var(--p100);color:var(--p600)">Shift Bidding</span>
     </div>
   </div>
   <div id="screen-landing"></div>
@@ -280,6 +280,8 @@ async function init() {
 function renderLanding() {
   currentRole = null; currentAgent = null;
   try { updateBidStatusBadge(); } catch(e) {}
+  var badge = document.getElementById('type-badge');
+  if (badge) { badge.textContent = 'Shift Bidding'; badge.className = ''; badge.style.cssText = 'font-size:11px;font-weight:500;background:var(--p100);color:var(--p600);padding:4px 12px;border-radius:20px'; }
   var pill = document.getElementById('hd-right') ? document.getElementById('hd-right').querySelector('.user-pill') : null;
   if (pill) pill.remove();
   document.getElementById('screen-landing').innerHTML =
@@ -370,6 +372,13 @@ function renderAdminShell() {
     if (hdRight) hdRight.appendChild(pill);
   }
   document.getElementById('screen-admin').innerHTML =
+    '<div class="card" id="ann-admin-card" style="margin-bottom:14px">' +
+    '<div class="card-head"><span class="card-title">&#128226; Announcement banner</span><span style="font-size:11px;color:var(--text3)">Visible to all agents (PA &amp; PE)</span></div>' +
+    '<textarea id="ann-text" style="width:100%;height:70px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:IBM Plex Sans,sans-serif;font-size:13px;color:var(--text);resize:vertical;outline:none;margin-bottom:10px" placeholder="Type your announcement here... (leave blank to hide)"></textarea>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn-primary" style="height:34px;font-size:12px" onclick="saveAnnouncement()">Save</button>' +
+    '<button class="btn-ghost" style="height:34px;font-size:12px" onclick="clearAnnouncement()">Clear</button>' +
+    '</div></div>' +
     '<div class="nav" id="main-nav">' +
     '<button class="ntab active" id="grp-PA" onclick="switchGroup(\'PA\')">PA Bidding</button>' +
     '<button class="ntab" id="grp-PE" onclick="switchGroup(\'PE\')">PE Bidding</button>' +
@@ -390,6 +399,11 @@ function renderAdminShell() {
     '<div id="apane-archive" style="display:none"></div>';
   showScreen('admin');
   TYPE = 'PA';
+  // Load saved announcement
+  fetchAnnouncement().then(function(ann) {
+    var el = document.getElementById('ann-text');
+    if (el) el.value = ann;
+  });
   setTimeout(function() { goAdmin('ranking'); }, 0);
 }
 
@@ -441,7 +455,6 @@ async function renderAdminRanking() {
   el.innerHTML = '<div class="loading-row"><span class="spinner"></span>Loading...</div>';
   try {
     await fetchBiddingStatus(); updateBidStatusBadge();
-    var ann = await fetchAnnouncement();
     var agents = await apiFetch('/agents?type=' + TYPE);
     var shifts = await apiFetch('/shifts?type=' + TYPE);
     var bids   = await apiFetch('/bids?type=' + TYPE);
@@ -453,19 +466,7 @@ async function renderAdminRanking() {
 
     var html = '';
 
-    // Announcement card
-    if (ann && ann.trim()) {
-      html += '<div class="ann-banner" style="margin-bottom:14px"><div class="ann-icon">&#128226;</div><div><span class="ann-tag">Announcement</span><div class="ann-text">' + ann + '</div></div></div>';
-    }
-
-    // Announcement admin editor
-    html += '<div class="card" style="margin-bottom:14px">' +
-      '<div class="card-head"><span class="card-title">Announcement banner</span><span style="font-size:11px;color:var(--text3)">Visible to all agents</span></div>' +
-      '<textarea id="ann-text" style="width:100%;height:70px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:IBM Plex Sans,sans-serif;font-size:13px;color:var(--text);resize:vertical;outline:none;margin-bottom:10px" placeholder="Type your announcement here... (leave blank to hide)"></textarea>' +
-      '<div style="display:flex;gap:8px">' +
-      '<button class="btn-primary" style="height:34px;font-size:12px" onclick="saveAnnouncement()">Save</button>' +
-      '<button class="btn-ghost" style="height:34px;font-size:12px" onclick="clearAnnouncement()">Clear</button>' +
-      '</div></div>';
+    
 
     // Stats
     html += '<div class="stats">' +
@@ -521,7 +522,6 @@ async function renderAdminRanking() {
     }
     html += '</div>';
     el.innerHTML = html;
-    if (ann) document.getElementById('ann-text').value = ann;
     document.getElementById('a-name').addEventListener('keydown', function(e) { if (e.key === 'Enter') addAgent(); });
   } catch(e) {
     el.innerHTML = '<div class="warn">Error loading: ' + e.message + '</div>';
