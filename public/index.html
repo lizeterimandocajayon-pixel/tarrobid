@@ -505,7 +505,7 @@ function renderAdminShell() {
     <div class="nav" id="main-nav" style="margin-bottom:6px">
       <button class="ntab active" id="grp-PA" onclick="switchGroup('PA')">PA Bidding</button>
       <button class="ntab" id="grp-PE" onclick="switchGroup('PE')">PE Bidding</button>
-      <button class="ntab" id="grp-archive" onclick="goAdmin('archive')">Archive</button>
+      <button class="ntab" id="grp-archive" onclick="showArchive()">Archive</button>
     </div>
     <div class="nav" id="sub-nav" style="margin-bottom:24px;background:var(--p800)">
       <button class="ntab active" id="sub-ranking" onclick="goAdmin('ranking')">Ranking</button>
@@ -525,23 +525,64 @@ function renderAdminShell() {
   goAdmin('ranking');
 }
 
+function switchGroup(group) {
+  TYPE = group;
+  updateTypeBadge();
+  const grpPA = document.getElementById('grp-PA');
+  const grpPE = document.getElementById('grp-PE');
+  const grpArc = document.getElementById('grp-archive');
+  if (grpPA) grpPA.classList.toggle('active', group==='PA');
+  if (grpPE) grpPE.classList.toggle('active', group==='PE');
+  if (grpArc) grpArc.classList.remove('active');
+  const subNav = document.getElementById('sub-nav');
+  if (subNav) subNav.style.display = 'flex';
+  goAdmin('ranking');
+}
+
+function showArchive() {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer=null; }
+  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer=null; }
+  ['grp-PA','grp-PE','grp-archive'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', id==='grp-archive');
+  });
+  const subNav = document.getElementById('sub-nav');
+  if (subNav) subNav.style.display = 'none';
+  ['ranking','shifts','bids','live','results','archive'].forEach(function(t) {
+    const el = document.getElementById('apane-'+t);
+    if (el) el.style.display = t==='archive' ? 'block' : 'none';
+  });
+  renderAdminArchive();
+}
+
 function goAdmin(tab) {
-  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  if (liveTimer) { clearInterval(liveTimer); liveTimer=null; }
+  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer=null; }
   adminTab = tab;
-  document.querySelectorAll('#screen-admin .ntab').forEach((el, i) => {
-    el.classList.toggle('active', ['ranking','shifts','bids','live','results','archive','pe'][i] === tab);
+
+  if (tab === 'archive') { showArchive(); return; }
+
+  // Update sub-nav active state
+  ['ranking','shifts','bids','live','results'].forEach(function(t) {
+    const el = document.getElementById('sub-'+t);
+    if (el) el.classList.toggle('active', t===tab);
   });
-  ['ranking','shifts','bids','live','results','archive','pe'].forEach(t => {
-    document.getElementById('apane-'+t).style.display = t===tab ? 'block' : 'none';
+
+  // Show correct pane, hide others
+  ['ranking','shifts','bids','live','results','archive'].forEach(function(t) {
+    const el = document.getElementById('apane-'+t);
+    if (el) el.style.display = t===tab ? 'block' : 'none';
   });
-  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer = null; }
+
+  // Show sub-nav
+  const subNav = document.getElementById('sub-nav');
+  if (subNav) subNav.style.display = 'flex';
+
   if (tab==='ranking') renderAdminRanking();
   if (tab==='shifts')  renderAdminShifts();
   if (tab==='bids')    renderAdminBids();
-  if (tab==='live')    { renderLiveView('apane-live'); liveTimer = setInterval(() => renderLiveView('apane-live'), 4000); }
+  if (tab==='live')    { renderLiveView('apane-live'); liveTimer=setInterval(function(){ renderLiveView('apane-live'); },4000); }
   if (tab==='results') renderAdminResults();
-  if (tab==='archive') renderAdminArchive();
-  if (tab==='pe')      renderPE('apane-pe');
 }
 
 // ── ADMIN: RANKING ────────────────────────
