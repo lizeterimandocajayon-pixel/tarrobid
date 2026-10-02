@@ -564,7 +564,8 @@ async function toggleBatchUpload() {
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
-function downloadTemplate() {
+function downloadTemplate(e) {
+  e.preventDefault();
   const csv = 'POS ID,Name,Adherence %,AHT (s)\nABC123,Juan dela Cruz,95.5,280\nDEF456,Maria Santos,92.0,310';
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
@@ -572,508 +573,89 @@ function downloadTemplate() {
   a.click();
 }
 
+async function loadXLSX() {
+  if (window.XLSX) return;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
 async function handleBatchFile(input) {
   const file = input.files[0]; if (!file) return;
   const resultsEl = document.getElementById('batch-results');
-  resultsEl.innerHTML = '<div class="loading-row"><span class="spinner"></span>Processing…</div>';
+  resultsEl.innerHTML = '<div class="loading-row"><span class="spinner"></span>Processing...</div>';
 
   let rows = [];
-  if (file.name.endsWith('.csv')) {
-    const text = await file.text();
-    const lines = text.split('\n').filter(l => l.trim());
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g,''));
-    for (let i = 1; i < lines.length; i++) {
-      const vals = lines[i].split(',').map(v => v.trim().replace(/['"]/g,''));
-      if (vals.length < 2) continue;
-      const row = {};
-      headers.forEach((h,j) => row[h] = vals[j]);
-      rows.push(row);
+  try {
+    if (file.name.endsWith('.csv')) {
+      const text = await file.text();
+      const lines = text.split('\n').filter(function(l){ return l.trim(); });
+      const headers = lines[0].split(',').map(function(h){ return h.trim().toLowerCase().replace(/['"]/g,''); });
+      for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].split(',').map(function(v){ return v.trim().replace(/['"]/g,''); });
+        if (vals.length < 2) continue;
+        const row = {};
+        headers.forEach(function(h,j){ row[h] = vals[j] || ''; });
+        rows.push(row);
+      }
+    } else {
+      await loadXLSX();
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(ws, {defval:''});
+      rows = raw.map(function(r) {
+        const n = {};
+        Object.keys(r).forEach(function(k){ n[k.toLowerCase().trim()] = String(r[k]).trim(); });
+        return n;
+      });
     }
-  } else {
-    // Excel — use SheetJS from CDN
-    const buf = await file.arrayBuffer();
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    document.head.appendChild(script);
-    await new Promise(res => script.onload = res);
-    const wb = XLSX.read(buf, {type:'array'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-    rows = rows.map(r => {
-      const normalized = {};
-      Object.keys(r).forEach(k => normalized[k.toLowerCase().trim()] = String(r[k]).trim());
-      return normalized;
-    });
+  } catch(e) {
+    resultsEl.innerHTML = '<div class="batch-result-row batch-err">Error reading file: ' + e.message + '</div>';
+    return;
   }
 
-  // Match and update agents
-  const agents = await api(\`/agents?type=\${TYPE}\`);
+  const agents = await api('/agents?type=' + TYPE);
   const results = [];
-  for (const row of rows) {
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const posId = (row['pos id'] || row['pos_id'] || row['posid'] || '').toUpperCase();
-    const name = (row['name'] || row['agent name'] || row['agent'] || '').toLowerCase();
-    const adh = parseFloat(row['adherence %'] || row['adherence'] || row['adh'] || '');
-    const aht = parseFloat(row['aht (s)'] || row['aht'] || '');
+    const name  = (row['name'] || row['agent name'] || row['agent'] || '').toLowerCase();
+    const adh   = parseFloat(row['adherence %'] || row['adherence'] || row['adh'] || '');
+    const aht   = parseFloat(row['aht (s)'] || row['aht'] || '');
+    const label = posId || name || 'Row ' + (i + 2);
 
-    if (isNaN(adh) || isNaN(aht)) { results.push({label: posId||name||'Unknown', status:'err', msg:'Missing or invalid scores'}); continue; }
+    if (isNaN(adh) || isNaN(aht)) {
+      results.push({label: label, status:'err', msg:'Missing or invalid scores'}); continue;
+    }
 
-    const agent = agents.find(a =>
-      (posId && a.pos_id && a.pos_id.toUpperCase() === posId) ||
-      (name && a.name && a.name.toLowerCase() === name)
-    );
+    const agent = agents.find(function(a) {
+      return (posId && a.pos_id && a.pos_id.toUpperCase() === posId) ||
+             (name && a.name && a.name.toLowerCase() === name);
+    });
 
-    if (!agent) { results.push({label: posId||name||'Unknown', status:'skip', msg:'Agent not found — skipped'}); continue; }
+    if (!agent) {
+      results.push({label: label, status:'skip', msg:'Agent not found — skipped'}); continue;
+    }
 
     try {
-      await api(\`/agents?id=\${agent.id}\`, 'PUT', { adherence: adh, aht });
-      results.push({label: agent.name, status:'ok', msg:\`Updated → \${adh}% adh, \${aht}s AHT\`});
-    } catch(e) { results.push({label: agent.name, status:'err', msg:'Update failed'}); }
+      await api('/agents?id=' + agent.id, 'PUT', {adherence: adh, aht: aht});
+      results.push({label: agent.name, status:'ok', msg:'Updated → ' + adh + '% adh, ' + aht + 's AHT'});
+    } catch(e) {
+      results.push({label: agent.name, status:'err', msg:'Update failed'});
+    }
   }
 
-  resultsEl.innerHTML = results.map(r => `
-    <div class="batch-result-row batch-\${r.status}">
-      \${r.status==='ok'?'✓':r.status==='skip'?'—':'✗'} <strong>\${r.label}</strong> — \${r.msg}
-    </div>`).join('');
+  resultsEl.innerHTML = results.map(function(r) {
+    var icon = r.status==='ok' ? '✓' : r.status==='skip' ? '—' : '✗';
+    return '<div class="batch-result-row batch-' + r.status + '">' + icon + ' <strong>' + r.label + '</strong> — ' + r.msg + '</div>';
+  }).join('');
 
-  const ok = results.filter(r=>r.status==='ok').length;
-  if (ok > 0) { showToast(\`✓ \${ok} agent(s) updated!\`); await renderAdminRanking(); }
+  const ok = results.filter(function(r){ return r.status==='ok'; }).length;
+  if (ok > 0) { showToast('✓ ' + ok + ' agent(s) updated!'); await renderAdminRanking(); }
   input.value = '';
 }
-
-function toggleBidding(open) {
-  await api('/bidding','POST',{open}); biddingOpen=open;
-  showToast(open?'🟢 Bidding is now open!':'🔴 Bidding closed');
-  renderAdminRanking(); updateBidStatusBadge();
-}
-
-async function addAgent() {
-  const name = document.getElementById('a-name').value.trim();
-  const posId = document.getElementById('a-pos').value.trim().toUpperCase();
-  const adh = parseFloat(document.getElementById('a-adh').value);
-  const aht = parseFloat(document.getElementById('a-aht').value);
-  if (!name||!posId||isNaN(adh)||isNaN(aht)) return;
-  await api('/agents','POST',{name,pos_id:posId,adherence:adh,aht,agent_type:TYPE});
-  document.getElementById('a-name').value='';
-  document.getElementById('a-pos').value='';
-  document.getElementById('a-adh').value='';
-  document.getElementById('a-aht').value='';
-  showToast('✓ Agent added!');
-  await renderAdminRanking();
-  document.getElementById('a-name').focus();
-}
-
-function updateAgent(id,adh,aht) {
-  clearTimeout(updateTimers[id]);
-  updateTimers[id] = setTimeout(async () => {
-    const agents = await api(`/agents?type=${TYPE}`);
-    const agent = agents.find(a=>a.id===id); if(!agent) return;
-    await api(`/agents?id=${id}`,'PUT',{
-      adherence: adh!==null?parseFloat(adh):agent.adherence,
-      aht: aht!==null?parseFloat(aht):agent.aht
-    });
-    await renderAdminRanking();
-  }, 700);
-}
-
-async function delAgent(id) {
-  if (!confirm('Remove this agent?')) return;
-  await api(`/agents?id=${id}`,'DELETE');
-  showToast('Agent removed','warn');
-  await renderAdminRanking();
-}
-
-// ── SHIFTS ────────────────────────────────
-async function renderAdminShifts() {
-  const el = document.getElementById('apane-shifts');
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span>Loading…</div>';
-  const shifts = await api(`/shifts?type=${TYPE}`);
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">${TYPE} Shifts</span>
-        <span class="cnt-badge">${shifts.length} shifts</span>
-      </div>
-      <div class="add-bar">
-        <input class="f1" id="s-name" placeholder="e.g. 4x11, Wed Thu Fri RD, 10:30AM" />
-        <button class="btn-add" onclick="addShift()">+ Add shift</button>
-      </div>
-      ${!shifts.length?'<div class="empty">No shifts yet.</div>':
-        shifts.map(s=>`
-          <div class="shift-row" id="shift-row-${s.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span class="shift-name" id="shift-name-${s.id}">${s.name}</span>
-            <input id="shift-edit-${s.id}" value="${s.name}" style="display:none;flex:1;height:28px;padding:0 8px;border:1px solid var(--p400);border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')saveShiftEdit(${s.id})" />
-            <button class="btn-ghost" style="height:26px;font-size:11px;padding:0 8px" onclick="startShiftEdit(${s.id})">Edit</button>
-            <button class="btn-ghost" id="shift-save-${s.id}" style="display:none;height:26px;font-size:11px;padding:0 8px;color:var(--p700)" onclick="saveShiftEdit(${s.id})">Save</button>
-            <button class="del-btn" onclick="delShift(${s.id})">×</button>
-          </div>`).join('')}
-    </div>`;
-  document.getElementById('s-name').addEventListener('keydown', e => e.key==='Enter' && addShift());
-}
-
-async function addShift() {
-  const name = document.getElementById('s-name').value.trim(); if(!name) return;
-  try { await api('/shifts','POST',{name,shift_type:TYPE}); document.getElementById('s-name').value=''; showToast('✓ Shift added!'); await renderAdminShifts(); document.getElementById('s-name').focus(); }
-  catch(e) { alert(e.message); }
-}
-
-async function delShift(id) {
-  if(!confirm('Remove this shift?')) return;
-  await api(`/shifts?id=${id}`,'DELETE'); showToast('Shift removed','warn'); await renderAdminShifts();
-}
-
-function startShiftEdit(id) {
-  document.getElementById('shift-name-'+id).style.display='none';
-  document.getElementById('shift-edit-'+id).style.display='block';
-  document.getElementById('shift-save-'+id).style.display='inline-flex';
-  const inp=document.getElementById('shift-edit-'+id); inp.focus(); inp.select();
-}
-
-async function saveShiftEdit(id) {
-  const newName=document.getElementById('shift-edit-'+id).value.trim(); if(!newName) return;
-  try { await api(`/shifts?id=${id}`,'PUT',{name:newName}); showToast('✓ Shift updated!'); await renderAdminShifts(); }
-  catch(e) { showToast('Error updating shift','error'); }
-}
-
-// ── BIDS ──────────────────────────────────
-async function renderAdminBids() {
-  const el = document.getElementById('apane-bids');
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span>Loading…</div>';
-  await fetchBiddingStatus();
-  const [agents, shifts, bids] = await Promise.all([
-    api(`/agents?type=${TYPE}`), api(`/shifts?type=${TYPE}`), api(`/bids?type=${TYPE}`)
-  ]);
-  if (!agents.length||!shifts.length) { el.innerHTML='<div class="card"><div class="empty">Add agents and shifts first.</div></div>'; return; }
-  const bidMap = Object.fromEntries(bids.map(b=>[b.agent_id,b]));
-  const opts = shifts.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  const locked = !biddingOpen;
-  el.innerHTML = `
-    ${locked?`<div class="warn">⚠ Bidding is closed. Open it on the Ranking tab.</div>`:`<div class="success-msg">✓ Bidding is open.</div>`}
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">${TYPE} Bids</span>
-        <span class="cnt-badge">${bids.length}/${agents.length} submitted</span>
-      </div>
-      ${agents.map((a,i) => {
-        const b = bidMap[a.id]||{};
-        return `<div class="bid-card">
-          <div class="bid-head">
-            <div class="rank-num ${rankClass(i)}" style="flex-shrink:0">${i+1}</div>
-            <span class="bid-name">${a.name}</span>
-            <span class="bid-score">Adh: ${a.adherence}% · AHT: ${a.aht}s</span>
-          </div>
-          <div class="prefs">
-            ${[['pref1_shift_id','1st choice','p1-lbl'],['pref2_shift_id','2nd choice','p2-lbl'],['pref3_shift_id','3rd choice','p3-lbl']].map(([col,lbl,cls])=>`
-              <div class="pref-item">
-                <span class="pref-lbl ${cls}">${lbl}</span>
-                <select class="pref-sel" data-agent="${a.id}" data-col="${col}" onchange="saveBid(${a.id})" ${locked?'disabled':''}>
-                  <option value="">— pick a shift —</option>${opts}
-                </select>
-              </div>`).join('')}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`;
-  agents.forEach(a => {
-    const b = bidMap[a.id]||{};
-    ['pref1_shift_id','pref2_shift_id','pref3_shift_id'].forEach(col => {
-      if(b[col]){ const sel=el.querySelector(`select[data-agent="${a.id}"][data-col="${col}"]`); if(sel) sel.value=b[col]; }
-    });
-  });
-}
-
-function saveBid(agentId) {
-  clearTimeout(bidTimers[agentId]);
-  bidTimers[agentId] = setTimeout(async () => {
-    const sels = document.querySelectorAll(`select[data-agent="${agentId}"]`);
-    const [p1,p2,p3] = [...sels].map(s=>parseInt(s.value)||null);
-    await api('/bids','POST',{agent_id:agentId,pref1_shift_id:p1,pref2_shift_id:p2,pref3_shift_id:p3});
-    showToast('✓ Bid saved!');
-  }, 400);
-}
-
-// ── LIVE VIEW ─────────────────────────────
-async function renderLiveView(paneId) {
-  const el = document.getElementById(paneId); if(!el) return;
-  await fetchBiddingStatus(); updateBidStatusBadge();
-  const [agents, shifts, bids] = await Promise.all([
-    api(`/agents?type=${TYPE}`), api(`/shifts?type=${TYPE}`), api(`/bids?type=${TYPE}`)
-  ]);
-  if (!shifts.length) { el.innerHTML='<div class="card"><div class="empty">No shifts added yet.</div></div>'; return; }
-  const bidMap = Object.fromEntries(bids.map(b=>[b.agent_id,b]));
-  const shiftMap = Object.fromEntries(shifts.map(s=>[s.id,{shift:s,contenders:[]}]));
-  agents.forEach((a,rank) => {
-    const b=bidMap[a.id]; if(!b) return;
-    [['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]].forEach(([col,pref])=>{
-      const sid=b[col]; if(sid&&shiftMap[sid]) shiftMap[sid].contenders.push({agent:a,pref});
-    });
-  });
-  const taken=new Set(); const winners={};
-  agents.forEach(a => {
-    const b=bidMap[a.id]||{};
-    for(const col of['pref1_shift_id','pref2_shift_id','pref3_shift_id']){
-      const sid=b[col]; if(sid&&!taken.has(sid)){taken.add(sid);winners[sid]=a.id;break;}
-    }
-  });
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:12px">
-      <div class="card-head" style="margin-bottom:4px">
-        <span class="card-title">Live bid board — ${TYPE}</span>
-        <span style="font-size:11px;color:var(--text3)">Refreshes every 4s</span>
-      </div>
-      <p style="font-size:12px;color:var(--text3)">Purple = projected winner · Contested = multiple bidders</p>
-    </div>
-    ${bids.length===0?'<div class="empty">No bids placed yet.</div>':''}
-    <div class="live-grid">
-      ${shifts.map(s=>{
-        const info=shiftMap[s.id];
-        const winnerId=winners[s.id];
-        const winner=winnerId?agents.find(a=>a.id===winnerId):null;
-        const others=info.contenders.filter(c=>c.agent.id!==winnerId);
-        return `<div class="live-card">
-          <div class="live-shift-head">
-            <span>${s.name}</span>
-            ${others.length?`<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">Contested</span>`:''}
-          </div>
-          ${winner?`<div class="live-winner"><span style="font-size:14px">👑</span><span class="live-winner-name">${winner.name}</span><span class="live-winner-score">${winner.adherence}%</span></div>`:`<div class="live-empty">No bids yet</div>`}
-          ${others.slice(0,3).map(c=>`<div class="live-contender"><div class="contested-dot"></div><span class="live-contender-name">${c.agent.name}</span><span class="live-contender-score">${c.agent.adherence}% · ${c.pref}${c.pref===1?'st':c.pref===2?'nd':'rd'}</span></div>`).join('')}
-          ${others.length>3?`<div style="font-size:11px;color:var(--text3);padding:4px 9px">+${others.length-3} more</div>`:''}
-        </div>`;
-      }).join('')}
-    </div>`;
-}
-
-// ── RESULTS ───────────────────────────────
-async function renderAdminResults() {
-  if (resultsTimer) { clearInterval(resultsTimer); resultsTimer=null; }
-  await refreshResults();
-  resultsTimer = setInterval(async () => {
-    if (adminTab==='results') await refreshResults();
-    else { clearInterval(resultsTimer); resultsTimer=null; }
-  }, 5000);
-}
-
-async function refreshResults() {
-  const el = document.getElementById('apane-results'); if(!el) return;
-  const [agents, shifts, bids] = await Promise.all([
-    api(`/agents?type=${TYPE}`), api(`/shifts?type=${TYPE}`), api(`/bids?type=${TYPE}`)
-  ]);
-  const taken=new Set();
-  const results = agents.map(agent => {
-    const b=bids.find(b=>b.agent_id===agent.id)||{};
-    let shiftName=null,prefUsed=null;
-    for(const [col,pref] of[['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]]){
-      const sid=b[col];
-      if(sid&&!taken.has(sid)){const shift=shifts.find(s=>s.id===sid);if(shift){taken.add(sid);shiftName=shift.name;prefUsed=pref;break;}}
-    }
-    return {agent,shiftName,prefUsed};
-  });
-  const unassigned=results.filter(r=>!r.shiftName).length;
-  const lastUpdate=new Date().toLocaleTimeString();
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">Live assignment — ${TYPE}</span>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="font-size:11px;color:var(--text3)">Updated ${lastUpdate}</span>
-          <button class="btn-ghost" onclick="exportResultsCSV()" style="height:30px;font-size:11px">↓ Export CSV</button>
-          <button class="btn-primary" onclick="saveAssignment()" style="height:30px;font-size:11px">💾 Save final</button>
-        </div>
-      </div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:14px">Auto-updates every 5s. Hit "Save final" to lock results.</p>
-      ${unassigned?`<div class="warn">⚠ ${unassigned} agent(s) unassigned.</div>`:`<div class="success-msg">✓ All agents assigned.</div>`}
-      ${results.map((r,i)=>`
-        <div class="res-row">
-          <div class="rank-num ${rankClass(i)}">${i+1}</div>
-          <span style="flex:1;font-weight:500;font-size:13px">${r.agent.name}</span>
-          <span style="font-size:11px;color:var(--text3);min-width:58px">${r.agent.adherence}% adh</span>
-          ${r.shiftName?`<span class="shift-pill">${r.shiftName}</span>`:`<span class="no-shift">Unassigned</span>`}
-          ${r.prefUsed?`<span class="pref-note">${r.prefUsed}${r.prefUsed===1?'st':r.prefUsed===2?'nd':'rd'} choice</span>`:''}
-        </div>`).join('')}
-    </div>`;
-  window._lastResults = results;
-}
-
-async function saveAssignment() {
-  await api('/results','POST',{type:TYPE}); showToast('✓ Results saved!');
-}
-
-function exportResultsCSV() {
-  if(!window._lastResults) return;
-  let csv='Rank,Agent,POS ID,Adherence %,Shift,Preference\n';
-  window._lastResults.forEach((r,i) => {
-    csv+=`"${i+1}","${r.agent.name}","${r.agent.pos_id||''}","${r.agent.adherence}","${r.shiftName||'Unassigned'}","${r.prefUsed?r.prefUsed+(r.prefUsed===1?'st':r.prefUsed===2?'nd':'rd')+' choice':'—'}"\n`;
-  });
-  const a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download=`tarrobid_${TYPE}_results.csv`; a.click();
-}
-
-// ── ARCHIVE ───────────────────────────────
-async function renderAdminArchive() {
-  const el = document.getElementById('apane-archive');
-  el.innerHTML = '<div class="loading-row"><span class="spinner"></span>Loading…</div>';
-  const list = await api('/archive');
-  el.innerHTML = `
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">Past months</span>
-        <span class="cnt-badge">${list.length} archived</span>
-      </div>
-      ${!list.length?'<div class="empty">No archives yet.</div>':
-        list.map(a=>`
-          <div class="archive-row">
-            <span class="archive-month">${a.month_label}</span>
-            <span class="archive-type">${a.agent_type}</span>
-            <span class="archive-date">${new Date(a.archived_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
-            <button class="btn-ghost" style="height:28px;font-size:11px" onclick="viewArchive(${a.id})">View</button>
-            <button class="btn-danger" style="height:28px;font-size:11px" onclick="delArchive(${a.id},'${a.month_label}')">Delete</button>
-          </div>`).join('')}
-    </div>
-    <div id="archive-detail"></div>`;
-}
-
-async function viewArchive(id) {
-  const entry=await api(`/archive?id=${id}`);
-  const data=entry.data;
-  document.getElementById('archive-detail').innerHTML=`
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">${entry.month_label} — ${entry.agent_type}</span>
-        <button class="btn-ghost" onclick="document.getElementById('archive-detail').innerHTML=''">Close</button>
-      </div>
-      ${data.results.map((r,i)=>`
-        <div class="res-row">
-          <div class="rank-num ${rankClass(i)}">${i+1}</div>
-          <span style="flex:1;font-weight:500;font-size:13px">${r.agent_name}</span>
-          <span style="font-size:11px;color:var(--text3)">${r.adherence}% adh</span>
-          ${r.shift_name?`<span class="shift-pill">${r.shift_name}</span>`:`<span class="no-shift">Unassigned</span>`}
-        </div>`).join('')}
-    </div>`;
-}
-
-// ── RESET ─────────────────────────────────
-function openReset() {
-  const d=new Date(); d.setMonth(d.getMonth()+1);
-  document.getElementById('month-label').value=d.toLocaleString('default',{month:'long'})+' '+d.getFullYear();
-  document.getElementById('reset-msg').innerHTML='';
-  document.getElementById('reset-modal').style.display='flex';
-}
-function closeReset() { document.getElementById('reset-modal').style.display='none'; }
-async function doReset() {
-  const label=document.getElementById('month-label').value.trim(); if(!label) return;
-  const msgEl=document.getElementById('reset-msg');
-  msgEl.innerHTML='<span class="spinner"></span>Archiving…';
-  try {
-    const res=await api('/reset','POST',{month_label:label,type:TYPE});
-    msgEl.innerHTML=`<div class="success-msg">✓ ${res.message}</div>`;
-    setTimeout(()=>{ closeReset(); goAdmin('ranking'); },1500);
-  } catch(e) { msgEl.innerHTML=`<div class="warn">Error: ${e.message}</div>`; }
-}
-
-// ── AGENT SHELL ───────────────────────────
-function renderAgentShell() {
-  updateBidStatusBadge(); updateTypeBadge();
-  let pill=document.getElementById('hd-right').querySelector('.user-pill');
-  if(!pill){ pill=document.createElement('span'); pill.className='user-pill'; document.getElementById('hd-right').appendChild(pill); }
-  pill.innerHTML=`${currentAgent.name} <button class="logout-btn" onclick="refreshAgent()" title="Refresh">↺</button> <button class="logout-btn" onclick="renderLanding()">× Exit</button>`;
-  document.getElementById('screen-agent').innerHTML=`
-    <div class="nav">
-      <button class="ntab active" onclick="goAgent('bid')">My Bid</button>
-      <button class="ntab" onclick="goAgent('live')">Live View</button>
-    </div>
-    <div id="agent-pane-bid"></div>
-    <div id="agent-pane-live" style="display:none"></div>`;
-  showScreen('agent');
-  goAgent('bid');
-}
-
-function goAgent(tab) {
-  if(liveTimer){clearInterval(liveTimer);liveTimer=null;}
-  ['bid','live'].forEach((t,i)=>{
-    document.getElementById('agent-pane-'+t).style.display=t===tab?'block':'none';
-    document.querySelectorAll('#screen-agent .ntab')[i].classList.toggle('active',t===tab);
-  });
-  if(tab==='bid') renderAgentBid();
-  if(tab==='live'){ renderLiveView('agent-pane-live'); liveTimer=setInterval(()=>renderLiveView('agent-pane-live'),4000); }
-}
-
-function refreshAgent() { renderAgentBid(); showToast('Refreshed'); }
-
-async function renderAgentBid() {
-  const el=document.getElementById('agent-pane-bid');
-  el.innerHTML='<div class="loading-row"><span class="spinner"></span>Loading…</div>';
-  await fetchBiddingStatus(); updateBidStatusBadge();
-  const [agents,shifts,bids]=await Promise.all([
-    api(`/agents?type=${TYPE}`), api(`/shifts?type=${TYPE}`), api(`/bids?type=${TYPE}`)
-  ]);
-  const sorted=[...agents].sort((a,b)=>{ if(b.adherence!==a.adherence)return b.adherence-a.adherence; return a.aht-b.aht; });
-  const myRank=sorted.findIndex(a=>a.id===currentAgent.id)+1;
-  const myBid=bids.find(b=>b.agent_id===currentAgent.id)||{};
-  const opts=shifts.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  const locked=!biddingOpen;
-  const announcement = await fetchAnnouncement();
-  el.innerHTML=`
-    <div class="agent-bid-wrap">
-      <div id="agent-announcement"></div>
-      ${locked
-        ?`<div class="bidding-closed-banner"><h3>🔴 Bidding is closed</h3><p>Your TL will open bidding shortly.</p></div>`
-        :`<div class="bidding-open-banner"><p>🟢 Bidding is open — select your shift preferences below.</p></div>`}
-      <div class="agent-bid-card">
-        <div class="agent-name-display">${currentAgent.name}</div>
-        <div class="agent-rank-display">Rank #${myRank} · ${TYPE} · Adherence: ${currentAgent.adherence}% · AHT: ${currentAgent.aht}s</div>
-        <div class="agent-pref-item">
-          <span class="agent-pref-lbl p1-lbl">1st choice</span>
-          <select class="agent-pref-sel" id="ap1" ${locked?'disabled':''}>
-            <option value="">— pick a shift —</option>${opts}
-          </select>
-        </div>
-        <div class="agent-pref-item">
-          <span class="agent-pref-lbl p2-lbl">2nd choice</span>
-          <select class="agent-pref-sel" id="ap2" ${locked?'disabled':''}>
-            <option value="">— pick a shift —</option>${opts}
-          </select>
-        </div>
-        <div class="agent-pref-item">
-          <span class="agent-pref-lbl p3-lbl">3rd choice</span>
-          <select class="agent-pref-sel" id="ap3" ${locked?'disabled':''}>
-            <option value="">— pick a shift —</option>${opts}
-          </select>
-        </div>
-        <button class="agent-save-btn" onclick="saveAgentBid()" ${locked?'disabled':''}>Save my preferences</button>
-        ${!locked?'<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">You can update your preferences anytime while bidding is open.</p>':''}
-        <div id="agent-bid-msg" style="margin-top:10px;font-size:12px;text-align:center"></div>
-      </div>
-    </div>`;
-  renderAnnouncementBanner(announcement, 'agent-announcement');
-  if(myBid.pref1_shift_id) document.getElementById('ap1').value=myBid.pref1_shift_id;
-  if(myBid.pref2_shift_id) document.getElementById('ap2').value=myBid.pref2_shift_id;
-  if(myBid.pref3_shift_id) document.getElementById('ap3').value=myBid.pref3_shift_id;
-}
-
-async function saveAgentBid() {
-  const p1=parseInt(document.getElementById('ap1').value)||null;
-  const p2=parseInt(document.getElementById('ap2').value)||null;
-  const p3=parseInt(document.getElementById('ap3').value)||null;
-  const msgEl=document.getElementById('agent-bid-msg');
-  try {
-    await api('/bids','POST',{agent_id:currentAgent.id,pref1_shift_id:p1,pref2_shift_id:p2,pref3_shift_id:p3});
-    msgEl.innerHTML='<span style="color:var(--green)">✓ Preferences saved!</span>';
-    showToast('✓ Bid saved!');
-    setTimeout(()=>msgEl.innerHTML='',3000);
-  } catch(e){ msgEl.innerHTML='<span style="color:var(--red)">Error saving. Try again.</span>'; }
-}
-
-async function delArchive(id, label) {
-  if (!confirm(`Delete archive for "${label}"? This cannot be undone.`)) return;
-  try {
-    await api(`/archive?id=${id}`, 'DELETE');
-    showToast('Archive deleted', 'warn');
-    await renderAdminArchive();
-  } catch(e) { showToast('Error deleting archive', 'error'); }
-}
-
-init();
-</script>
-</body>
-</html>
