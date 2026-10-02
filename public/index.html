@@ -222,8 +222,7 @@ tbody tr:hover{background:var(--p50)}
       <div class="hd-sub">Pizza Voice Ops · Shift Bidding</div>
     </div>
     <div class="hd-right" id="hd-right">
-      <span class="pa-badge">PA Bidding</span>
-      <span class="wip-badge">PE — coming soon</span>
+      <span id="type-badge" class="pa-badge">PA Bidding</span>
     </div>
   </div>
 
@@ -249,7 +248,7 @@ tbody tr:hover{background:var(--p50)}
 
 <script>
 const API = '/api';
-const TYPE = 'PA';
+let TYPE = 'PA';
 const ADMIN_PASSWORD = 'TarroBid';
 
 let currentRole = null; // 'admin' | 'agent'
@@ -405,19 +404,27 @@ function renderAdminShell() {
     document.getElementById('hd-right').appendChild(pill);
   }
 
-  const adminPanes = ['ranking','shifts','bids','live','results','archive','pe'];
   document.getElementById('screen-admin').innerHTML = `
-    <div class="nav">
-      <button class="ntab active" onclick="goAdmin('ranking')">Ranking</button>
-      <button class="ntab" onclick="goAdmin('shifts')">Shifts</button>
-      <button class="ntab" onclick="goAdmin('bids')">Bids</button>
-      <button class="ntab" onclick="goAdmin('live')">Live View</button>
-      <button class="ntab" onclick="goAdmin('results')">Results</button>
-      <button class="ntab" onclick="goAdmin('archive')">Archive</button>
-      <button class="ntab" onclick="goAdmin('pe')">PE<span class="wip-tag">WIP</span></button>
+    <div class="nav" id="main-nav" style="margin-bottom:6px">
+      <button class="ntab active" id="grp-PA" onclick="switchGroup('PA')">PA Bidding</button>
+      <button class="ntab" id="grp-PE" onclick="switchGroup('PE')">PE Bidding</button>
+      <button class="ntab" id="grp-archive" onclick="goAdmin('archive')">Archive</button>
     </div>
-    ${adminPanes.map(t => `<div id="apane-${t}" style="display:none"></div>`).join('')}`;
+    <div class="nav" id="sub-nav" style="margin-bottom:24px;background:var(--p800)">
+      <button class="ntab active" id="sub-ranking" onclick="goAdmin('ranking')">Ranking</button>
+      <button class="ntab" id="sub-shifts" onclick="goAdmin('shifts')">Shifts</button>
+      <button class="ntab" id="sub-bids" onclick="goAdmin('bids')">Bids</button>
+      <button class="ntab" id="sub-live" onclick="goAdmin('live')">Live View</button>
+      <button class="ntab" id="sub-results" onclick="goAdmin('results')">Results</button>
+    </div>
+    <div id="apane-ranking" style="display:none"></div>
+    <div id="apane-shifts" style="display:none"></div>
+    <div id="apane-bids" style="display:none"></div>
+    <div id="apane-live" style="display:none"></div>
+    <div id="apane-results" style="display:none"></div>
+    <div id="apane-archive" style="display:none"></div>`;
   showScreen('admin');
+  TYPE = 'PA';
   goAdmin('ranking');
 }
 
@@ -955,21 +962,11 @@ async function saveAgentBid() {
 }
 
 // ── PE WIP ────────────────────────────────
-function renderPE(paneId) {
-  document.getElementById(paneId).innerHTML=`
-    <div class="card">
-      <div class="wip-screen">
-        <div class="wip-icon">🚧</div>
-        <div class="wip-title">PE Bidding</div>
-        <div class="wip-desc">Pizza Expert shift bidding is being built. Same ranking, bid preferences, and live board as PA.</div>
-        <span class="wip-pill">Work in progress</span>
-      </div>
-    </div>`;
-}
+
 
 function refreshAdmin() {
   if (adminTab) goAdmin(adminTab);
-  showToast('Refreshed');
+  showToast('Refreshed (' + TYPE + ')');
 }
 
 function refreshAgent() {
