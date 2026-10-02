@@ -262,7 +262,7 @@ async function apiFetch(path, method, body) {
 }
 
 async function fetchBiddingStatus() {
-  try { var r = await apiFetch('/bidding'); biddingOpen = r.open; } catch(e) { biddingOpen = false; }
+  try { var r = await apiFetch('/bidding?type=' + TYPE); biddingOpen = r.open; } catch(e) { biddingOpen = false; }
 }
 
 async function fetchAnnouncement() {
@@ -395,7 +395,7 @@ function renderAdminShell() {
     '<div id="apane-archive" style="display:none"></div>';
   showScreen('admin');
   TYPE = 'PA';
-  goAdmin('ranking');
+  setTimeout(function() { goAdmin('ranking'); }, 0);
 }
 
 function switchGroup(group) {
@@ -497,12 +497,12 @@ async function renderAdminRanking() {
       '<button class="btn-danger" onclick="openReset()" style="height:30px;font-size:11px">&#8635; New month</button>' +
       '</div></div>' +
       '<div id="batch-panel" style="display:none;margin-bottom:14px">' +
-      '<div class="batch-zone" onclick="document.getElementById(\'batch-file\').click()">' +
-      '<input type="file" id="batch-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleBatchFile(this)"/>' +
+      '<div class="batch-zone">' +
       '<div style="font-size:22px;margin-bottom:6px">&#128193;</div>' +
-      '<div style="font-size:13px;font-weight:500">Click to upload CSV or Excel</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-top:4px">Columns: POS ID or Name &middot; Adherence % &middot; AHT (s)</div>' +
-      '<a href="#" onclick="downloadTemplate(event)" style="font-size:11px;color:var(--p500);margin-top:6px;display:inline-block">Download template</a>' +
+      '<div style="font-size:13px;font-weight:500;margin-bottom:8px">Upload CSV or Excel to update scores</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Columns: POS ID or Name &middot; Adherence % &middot; AHT (s)</div>' +
+      '<label style="display:inline-block;height:36px;line-height:36px;padding:0 16px;background:var(--p700);color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Choose file<input type="file" id="batch-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleBatchFile(this)"/></label>' +
+      ' &nbsp; <a href="#" onclick="downloadTemplate(event)" style="font-size:12px;color:var(--p500)">Download template</a>' +
       '</div><div id="batch-results"></div></div>' +
       '<div class="add-bar">' +
       '<input class="f1" id="a-name" placeholder="Agent name"/>' +
@@ -542,8 +542,8 @@ async function renderAdminRanking() {
 }
 
 async function toggleBidding(open) {
-  await apiFetch('/bidding', 'POST', { open: open }); biddingOpen = open;
-  showToast(open ? '🟢 Bidding is now open!' : '🔴 Bidding closed');
+  await apiFetch('/bidding', 'POST', { open: open, type: TYPE }); biddingOpen = open;
+  showToast(open ? TYPE + ' bidding is now open!' : TYPE + ' bidding closed');
   renderAdminRanking(); updateBidStatusBadge();
 }
 
