@@ -988,6 +988,30 @@ async function renderAgentBid() {
       html += '</div>';
     }
 
+    // Won shift card
+    var myWonShiftId = simAgentWon[currentAgent.id];
+    var myWonShift = myWonShiftId ? shifts.find(function(s){ return s.id === myWonShiftId; }) : null;
+    var myWonPref = null;
+    if (myWonShift) {
+      if (String(myBid.pref1_shift_id) === String(myWonShiftId)) myWonPref = '1st choice';
+      else if (String(myBid.pref2_shift_id) === String(myWonShiftId)) myWonPref = '2nd choice';
+      else if (String(myBid.pref3_shift_id) === String(myWonShiftId)) myWonPref = '3rd choice';
+    }
+
+    if (myWonShift) {
+      html += '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:13px;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">' +
+        '<span style="font-size:13px;font-weight:600;color:var(--p900)">Your projected shift</span>' +
+        '<span style="font-size:10px;font-weight:600;background:#f0fdf4;color:#15803d;padding:2px 9px;border-radius:10px;border:1px solid #bbf7d0">&#10003; Winning</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--p50);border:1px solid var(--border);border-radius:8px">' +
+        '<div style="width:30px;height:30px;background:var(--p700);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">&#128081;</div>' +
+        '<div style="flex:1">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--p900)">' + myWonShift.name + '</div>' +
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (myWonPref || '') + ' &middot; Bidding still open</div>' +
+        '</div></div></div>';
+    }
+
     html += (locked
       ? '<div class="bid-closed-banner"><h3>&#128308; Bidding is closed</h3><p>Your TL will open bidding shortly.</p></div>'
       : '<div class="bid-open-banner"><p>&#128994; Bidding is open &mdash; select your shift preferences below.</p></div>') +
