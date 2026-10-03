@@ -914,10 +914,43 @@ async function renderAgentBid() {
     var opts   = shifts.map(function(s) { return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('');
     var locked = !biddingOpen;
 
+    // Compute which shifts are taken based on current bids
+    var takenShiftIds = {};
+    var sortedForBidding = agents.slice().sort(function(a,b){ return b.adherence !== a.adherence ? b.adherence - a.adherence : a.aht - b.aht; });
+    var takenSet = {};
+    sortedForBidding.forEach(function(a) {
+      var b = bids.find(function(b){ return b.agent_id === a.id; }) || {};
+      ['pref1_shift_id','pref2_shift_id','pref3_shift_id'].forEach(function(col) {
+        var sid = b[col];
+        if (sid && !takenSet[sid]) { takenSet[sid] = true; takenShiftIds[sid] = true; }
+      });
+    });
+    var openCount = shifts.filter(function(s){ return !takenShiftIds[s.id]; }).length;
+    var takenCount = shifts.length - openCount;
+
     var html = '<div class="agent-bid-wrap">';
     if (ann && ann.trim()) {
       html += '<div class="ann-banner"><div class="ann-icon">&#128226;</div><div><span class="ann-tag">Announcement</span><div class="ann-text">'+ann+'</div></div></div>';
     }
+
+    // Available shifts section
+    if (shifts.length) {
+      html += '<div class="card" style="margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<span style="font-size:13px;font-weight:600;color:var(--p900)">Available shifts</span>' +
+        '<span style="font-size:11px;color:var(--text3)">'+openCount+' open &middot; '+takenCount+' taken</span>' +
+        '</div>';
+      shifts.forEach(function(s) {
+        var taken = !!takenShiftIds[s.id];
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
+          '<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+(taken?'#cbd5e1':'#10b981')+'""></div>' +
+          '<span style="flex:1;font-size:12px;font-weight:500;color:'+(taken?'var(--text3)':'var(--text)')+';'+(taken?'text-decoration:line-through':'')+'">' + s.name + '</span>' +
+          '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+(taken?'#f1f5f9':'#f0fdf4')+';color:'+(taken?'var(--text3)':'#15803d')+'">'+(taken?'Taken':'Open')+'</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+
     html += (locked
       ? '<div class="bid-closed-banner"><h3>&#128308; Bidding is closed</h3><p>Your TL will open bidding shortly.</p></div>'
       : '<div class="bid-open-banner"><p>&#128994; Bidding is open &mdash; select your shift preferences below.</p></div>') +
