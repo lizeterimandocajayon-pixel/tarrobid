@@ -914,15 +914,14 @@ async function renderAgentBid() {
     var opts   = shifts.map(function(s) { return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('');
     var locked = !biddingOpen;
 
-    // Open shifts = shifts NOT assigned in saved results
-    var assignedShiftIds = {};
-    try {
-      var savedResults = await apiFetch('/results?type=' + TYPE);
-      savedResults.forEach(function(r) {
-        if (r.shift_id && r.shift_name) assignedShiftIds[String(r.shift_id)] = true;
-      });
-    } catch(e) {}
-    var openCount = shifts.filter(function(s){ return !assignedShiftIds[String(s.id)]; }).length;
+    // Flag shifts that nobody has bid on at all
+    var biddedShiftIds = {};
+    bids.forEach(function(b) {
+      if (b.pref1_shift_id) biddedShiftIds[String(b.pref1_shift_id)] = true;
+      if (b.pref2_shift_id) biddedShiftIds[String(b.pref2_shift_id)] = true;
+      if (b.pref3_shift_id) biddedShiftIds[String(b.pref3_shift_id)] = true;
+    });
+    var openCount = shifts.filter(function(s){ return !biddedShiftIds[String(s.id)]; }).length;
     var takenCount = shifts.length - openCount;
 
     var html = '<div class="agent-bid-wrap">';
@@ -938,7 +937,7 @@ async function renderAgentBid() {
         '<span style="font-size:11px;color:var(--text3)">' + openCount + ' unassigned</span>' +
         '</div>';
       shifts.forEach(function(s) {
-        var isOpen = !assignedShiftIds[String(s.id)];
+        var isOpen = !biddedShiftIds[String(s.id)];
         html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
           '<span style="flex:1;font-size:12px;font-weight:500;color:var(--text)">' + s.name + '</span>' +
           (isOpen
