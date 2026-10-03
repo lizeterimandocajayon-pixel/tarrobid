@@ -919,14 +919,19 @@ async function renderAgentBid() {
     var opts   = shifts.map(function(s) { return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('');
     var locked = !biddingOpen;
 
-    // Flag shifts that nobody has bid on at all
-    var biddedShiftIds = {};
-    bids.forEach(function(b) {
-      if (b.pref1_shift_id) biddedShiftIds[String(b.pref1_shift_id)] = true;
-      if (b.pref2_shift_id) biddedShiftIds[String(b.pref2_shift_id)] = true;
-      if (b.pref3_shift_id) biddedShiftIds[String(b.pref3_shift_id)] = true;
+    // Simulate assignment to find shifts with no projected winner
+    var wonShiftIds = {};
+    var agentsSorted = agents.slice().sort(function(a,b){ return b.adherence !== a.adherence ? b.adherence - a.adherence : a.aht - b.aht; });
+    var takenInSim = {};
+    agentsSorted.forEach(function(a) {
+      var b = bids.find(function(b){ return b.agent_id === a.id; }) || {};
+      var prefs = ['pref1_shift_id','pref2_shift_id','pref3_shift_id'];
+      for (var p = 0; p < prefs.length; p++) {
+        var sid = b[prefs[p]];
+        if (sid && !takenInSim[sid]) { takenInSim[sid] = true; wonShiftIds[String(sid)] = true; break; }
+      }
     });
-    var openCount = shifts.filter(function(s){ return !biddedShiftIds[String(s.id)]; }).length;
+    var openCount = shifts.filter(function(s){ return !wonShiftIds[String(s.id)]; }).length;
     var takenCount = shifts.length - openCount;
 
     var html = '<div class="agent-bid-wrap">';
@@ -941,7 +946,7 @@ async function renderAgentBid() {
         '<span style="font-size:13px;font-weight:600;color:var(--p900)">Shifts</span>' +
         '<span style="font-size:11px;color:var(--text3)">' + openCount + ' unassigned</span>' +
         '</div>';
-      var noOwnerShifts = shifts.filter(function(s){ return !biddedShiftIds[String(s.id)]; });
+      var noOwnerShifts = shifts.filter(function(s){ return !wonShiftIds[String(s.id)]; });
       if (!noOwnerShifts.length) {
         html += '<div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">All shifts have been bid on.</div>';
       } else {
