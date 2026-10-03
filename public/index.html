@@ -919,7 +919,7 @@ async function renderAgentBid() {
     try {
       var savedResults = await apiFetch('/results?type=' + TYPE);
       savedResults.forEach(function(r) {
-        if (r.shift_id) assignedShiftIds[String(r.shift_id)] = true;
+        if (r.shift_id && r.shift_name) assignedShiftIds[String(r.shift_id)] = true;
       });
     } catch(e) {}
     var openCount = shifts.filter(function(s){ return !assignedShiftIds[String(s.id)]; }).length;
