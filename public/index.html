@@ -704,38 +704,43 @@ async function renderLiveView(paneId) {
         var sid = b[arr[0]]; if (sid && shiftMap[sid]) shiftMap[sid].contenders.push({agent:a,pref:arr[1]});
       });
     });
-    var taken = {}; var winners = {};
+    // Run simulation — each agent wins at most one shift
+    var taken = {}; var winners = {}; var agentWon = {};
     agents.forEach(function(a) {
       var b = bidMap[a.id] || {};
       var prefs = ['pref1_shift_id','pref2_shift_id','pref3_shift_id'];
       for (var p = 0; p < prefs.length; p++) {
         var sid = b[prefs[p]];
-        if (sid && !taken[sid]) { taken[sid] = true; winners[sid] = a.id; break; }
+        if (sid && !taken[sid]) { taken[sid] = true; winners[sid] = a.id; agentWon[a.id] = sid; break; }
       }
     });
     var html = '<div class="card" style="margin-bottom:12px"><div class="card-head" style="margin-bottom:4px">' +
       '<span class="card-title">Live bid board &mdash; '+TYPE+'</span>' +
       '<span style="font-size:11px;color:var(--text3)">Refreshes every 4s</span></div>' +
-      '<p style="font-size:12px;color:var(--text3)">Purple = projected winner &middot; Contested = multiple bidders</p></div>';
+      '<p style="font-size:12px;color:var(--text3)">Purple = projected winner &middot; Contested = multiple active bidders</p></div>';
     if (!bids.length) html += '<div class="empty">No bids placed yet.</div>';
     html += '<div class="live-grid">';
     shifts.forEach(function(s) {
       var info = shiftMap[s.id];
       var winnerId = winners[s.id];
       var winner = winnerId ? agents.find(function(a) { return a.id === winnerId; }) : null;
-      var others = info.contenders.filter(function(c) { return c.agent.id !== winnerId; });
+      // Only show contenders who haven't already won another shift
+      var activeContenders = info.contenders.filter(function(c) {
+        return c.agent.id !== winnerId && !agentWon[c.agent.id];
+      });
+      var hasBids = info.contenders.length > 0;
       html += '<div class="live-card"><div class="live-shift-head"><span>'+s.name+'</span>' +
-        (others.length ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">Contested</span>' : '') +
+        (winner && activeContenders.length ? '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">Contested</span>' : '') +
         '</div>';
       if (winner) {
         html += '<div class="live-winner"><span style="font-size:14px">&#128081;</span><span class="live-winner-name">'+(winner.name||winner.pos_id)+'</span><span class="live-winner-score">'+winner.adherence+'%</span></div>';
       } else {
-        html += '<div class="live-empty">No bids yet</div>';
+        html += '<div class="live-empty">'+(hasBids ? 'No winner yet' : 'No bids yet')+'</div>';
       }
-      others.slice(0,3).forEach(function(c) {
+      activeContenders.slice(0,3).forEach(function(c) {
         html += '<div class="live-contender"><div class="contested-dot"></div><span class="live-contender-name">'+(c.agent.name||c.agent.pos_id)+'</span><span class="live-contender-score">'+c.agent.adherence+'% &middot; '+c.pref+(c.pref===1?'st':c.pref===2?'nd':'rd')+'</span></div>';
       });
-      if (others.length > 3) html += '<div style="font-size:11px;color:var(--text3);padding:4px 9px">+'+(others.length-3)+' more</div>';
+      if (activeContenders.length > 3) html += '<div style="font-size:11px;color:var(--text3);padding:4px 9px">+'+(activeContenders.length-3)+' more</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -922,13 +927,13 @@ async function renderAgentBid() {
     // Simulate assignment to find shifts with no projected winner
     var wonShiftIds = {};
     var agentsSorted = agents.slice().sort(function(a,b){ return b.adherence !== a.adherence ? b.adherence - a.adherence : a.aht - b.aht; });
-    var takenInSim = {};
+    var takenInSim = {}; var agentWonSim = {};
     agentsSorted.forEach(function(a) {
       var b = bids.find(function(b){ return b.agent_id === a.id; }) || {};
       var prefs = ['pref1_shift_id','pref2_shift_id','pref3_shift_id'];
       for (var p = 0; p < prefs.length; p++) {
         var sid = b[prefs[p]];
-        if (sid && !takenInSim[sid]) { takenInSim[sid] = true; wonShiftIds[String(sid)] = true; break; }
+        if (sid && !takenInSim[sid]) { takenInSim[sid] = true; wonShiftIds[String(sid)] = true; agentWonSim[a.id] = true; break; }
       }
     });
     var openCount = shifts.filter(function(s){ return !wonShiftIds[String(s.id)]; }).length;
