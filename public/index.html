@@ -933,21 +933,25 @@ async function renderAgentBid() {
       html += '<div class="ann-banner"><div class="ann-icon">&#128226;</div><div><span class="ann-tag">Announcement</span><div class="ann-text">'+ann+'</div></div></div>';
     }
 
-    // Available shifts section
+    // Available shifts section — open only
+    var openShifts = shifts.filter(function(s){ return !takenShiftIds[s.id]; });
     if (shifts.length) {
       html += '<div class="card" style="margin-bottom:12px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
-        '<span style="font-size:13px;font-weight:600;color:var(--p900)">Available shifts</span>' +
-        '<span style="font-size:11px;color:var(--text3)">'+openCount+' open &middot; '+takenCount+' taken</span>' +
+        '<span style="font-size:13px;font-weight:600;color:var(--p900)">Open shifts</span>' +
+        '<span style="font-size:11px;color:var(--text3)">'+openCount+' of '+shifts.length+' available</span>' +
         '</div>';
-      shifts.forEach(function(s) {
-        var taken = !!takenShiftIds[s.id];
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
-          '<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:'+(taken?'#cbd5e1':'#10b981')+'""></div>' +
-          '<span style="flex:1;font-size:12px;font-weight:500;color:'+(taken?'var(--text3)':'var(--text)')+';'+(taken?'text-decoration:line-through':'')+'">' + s.name + '</span>' +
-          '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+(taken?'#f1f5f9':'#f0fdf4')+';color:'+(taken?'var(--text3)':'#15803d')+'">'+(taken?'Taken':'Open')+'</span>' +
-          '</div>';
-      });
+      if (!openShifts.length) {
+        html += '<div style="font-size:12px;color:var(--text3);font-style:italic;padding:6px 0">All shifts have been claimed.</div>';
+      } else {
+        openShifts.forEach(function(s) {
+          html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
+            '<div style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#10b981"></div>' +
+            '<span style="flex:1;font-size:12px;font-weight:500;color:var(--text)">' + s.name + '</span>' +
+            '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#f0fdf4;color:#15803d">Open</span>' +
+            '</div>';
+        });
+      }
       html += '</div>';
     }
 
