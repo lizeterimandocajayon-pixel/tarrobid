@@ -914,17 +914,12 @@ async function renderAgentBid() {
     var opts   = shifts.map(function(s) { return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('');
     var locked = !biddingOpen;
 
-    // Compute which shifts are taken based on current bids
+    // Compute which shifts are taken based on saved results
     var takenShiftIds = {};
-    var sortedForBidding = agents.slice().sort(function(a,b){ return b.adherence !== a.adherence ? b.adherence - a.adherence : a.aht - b.aht; });
-    var takenSet = {};
-    sortedForBidding.forEach(function(a) {
-      var b = bids.find(function(b){ return b.agent_id === a.id; }) || {};
-      ['pref1_shift_id','pref2_shift_id','pref3_shift_id'].forEach(function(col) {
-        var sid = b[col];
-        if (sid && !takenSet[sid]) { takenSet[sid] = true; takenShiftIds[sid] = true; }
-      });
-    });
+    try {
+      var results = await apiFetch('/results?type=' + TYPE);
+      results.forEach(function(r) { if (r.shift_id) takenShiftIds[r.shift_id] = true; });
+    } catch(e) {}
     var openCount = shifts.filter(function(s){ return !takenShiftIds[s.id]; }).length;
     var takenCount = shifts.length - openCount;
 
