@@ -914,13 +914,15 @@ async function renderAgentBid() {
     var opts   = shifts.map(function(s) { return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('');
     var locked = !biddingOpen;
 
-    // Compute which shifts are taken based on saved results
-    var takenShiftIds = {};
+    // Open shifts = shifts NOT assigned in saved results
+    var assignedShiftIds = {};
     try {
-      var results = await apiFetch('/results?type=' + TYPE);
-      results.forEach(function(r) { if (r.shift_id) takenShiftIds[r.shift_id] = true; });
+      var savedResults = await apiFetch('/results?type=' + TYPE);
+      savedResults.forEach(function(r) {
+        if (r.shift_id) assignedShiftIds[String(r.shift_id)] = true;
+      });
     } catch(e) {}
-    var openCount = shifts.filter(function(s){ return !takenShiftIds[s.id]; }).length;
+    var openCount = shifts.filter(function(s){ return !assignedShiftIds[String(s.id)]; }).length;
     var takenCount = shifts.length - openCount;
 
     var html = '<div class="agent-bid-wrap">';
@@ -929,7 +931,7 @@ async function renderAgentBid() {
     }
 
     // Available shifts section — open only
-    var openShifts = shifts.filter(function(s){ return !takenShiftIds[s.id]; });
+    var openShifts = shifts.filter(function(s){ return !assignedShiftIds[String(s.id)]; });
     if (shifts.length) {
       html += '<div class="card" style="margin-bottom:12px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
