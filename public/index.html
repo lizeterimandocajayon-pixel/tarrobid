@@ -707,9 +707,11 @@ async function renderLiveView(paneId) {
     var taken = {}; var winners = {};
     agents.forEach(function(a) {
       var b = bidMap[a.id] || {};
-      ['pref1_shift_id','pref2_shift_id','pref3_shift_id'].forEach(function(col) {
-        var sid = b[col]; if (sid && !taken[sid]) { taken[sid] = true; winners[sid] = a.id; return; }
-      });
+      var prefs = ['pref1_shift_id','pref2_shift_id','pref3_shift_id'];
+      for (var p = 0; p < prefs.length; p++) {
+        var sid = b[prefs[p]];
+        if (sid && !taken[sid]) { taken[sid] = true; winners[sid] = a.id; break; }
+      }
     });
     var html = '<div class="card" style="margin-bottom:12px"><div class="card-head" style="margin-bottom:4px">' +
       '<span class="card-title">Live bid board &mdash; '+TYPE+'</span>' +
@@ -761,11 +763,14 @@ async function refreshResults() {
     var results = agents.map(function(agent) {
       var b = bids.find(function(b) { return b.agent_id === agent.id; }) || {};
       var shiftName = null; var prefUsed = null;
-      [['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]].forEach(function(arr) {
-        if (shiftName) return;
-        var sid = b[arr[0]];
-        if (sid && !taken[sid]) { var shift = shifts.find(function(s) { return s.id === sid; }); if (shift) { taken[sid] = true; shiftName = shift.name; prefUsed = arr[1]; } }
-      });
+      var prefs = [['pref1_shift_id',1],['pref2_shift_id',2],['pref3_shift_id',3]];
+      for (var p = 0; p < prefs.length; p++) {
+        var sid = b[prefs[p][0]];
+        if (sid && !taken[sid]) {
+          var shift = shifts.find(function(s) { return s.id === sid; });
+          if (shift) { taken[sid] = true; shiftName = shift.name; prefUsed = prefs[p][1]; break; }
+        }
+      }
       return {agent:agent,shiftName:shiftName,prefUsed:prefUsed};
     });
     var unassigned = results.filter(function(r) { return !r.shiftName; }).length;
