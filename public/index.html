@@ -936,15 +936,17 @@ async function renderAgentBid() {
         '<span style="font-size:13px;font-weight:600;color:var(--p900)">Shifts</span>' +
         '<span style="font-size:11px;color:var(--text3)">' + openCount + ' unassigned</span>' +
         '</div>';
-      shifts.forEach(function(s) {
-        var isOpen = !biddedShiftIds[String(s.id)];
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
-          '<span style="flex:1;font-size:12px;font-weight:500;color:var(--text)">' + s.name + '</span>' +
-          (isOpen
-            ? '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e">No owner</span>'
-            : '<span style="font-size:10px;color:var(--text3)">Assigned</span>') +
-          '</div>';
-      });
+      var noOwnerShifts = shifts.filter(function(s){ return !biddedShiftIds[String(s.id)]; });
+      if (!noOwnerShifts.length) {
+        html += '<div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">All shifts have been bid on.</div>';
+      } else {
+        noOwnerShifts.forEach(function(s) {
+          html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:5px">' +
+            '<span style="flex:1;font-size:12px;font-weight:500;color:var(--text)">' + s.name + '</span>' +
+            '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e">No owner</span>' +
+            '</div>';
+        });
+      }
       html += '</div>';
     }
 
